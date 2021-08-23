@@ -1,0 +1,4 @@
+sample	file	adaptor
+A	fastq/A.fq.gz	AAATTTCCCGGG
+B	fastq/B.fq.gz	AAATTTCCCGGG
+C	fastq/C.fq.gz	AAATTTCCCGGG

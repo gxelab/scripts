@@ -1,0 +1,11 @@
+sample_list: rnaseq_se.samples.tsv
+
+genome: genome.fa
+
+bt2_idx: bt2_idx_prefix
+
+star_idx: star_index_dir
+
+stranded: "yes"
+gtf: genome.gtf
+
