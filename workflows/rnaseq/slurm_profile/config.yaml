@@ -1,0 +1,4 @@
+jobs: 4
+cluster: 'sbatch -c {threads} --mem={resources.mem_mb}'
+default-resources: [mem_mb=2048]
+
