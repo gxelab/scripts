@@ -54,10 +54,11 @@ rule star_map:
     params:
         star_idx=config['star_idx'],
         output_prefix="mapped_reads/{sample}_"
+    resources: mem_mb=16384
     shell:
         "STAR --runMode alignReads --genomeDir {params.star_idx} --readFilesIn {input} --readFilesCommand zcat "
         "--outFileNamePrefix {params.output_prefix} --runThreadN {threads} --outSAMtype BAM SortedByCoordinate "
-        "--outSAMattributes All --limitBAMsortRAM 16000000000"
+        "--outSAMattributes All --limitBAMsortRAM 16000000000 2>&1 >{log}"
 
 
 rule quant_gene:
@@ -109,7 +110,7 @@ rule genome_cov_fw:
         "logs/genome_cov_{sample}_fw.log"
     threads: 4
     shell:
-        "bamCoverage -b {input} -o {output} -bs 1 --minMappingQuality 10 --minFragmentLength 18 --filterRNAstrand reverse -p {threads}"
+        "bamCoverage -b {input} -o {output} -bs 1 --minMappingQuality 10 --minFragmentLength 18 --filterRNAstrand reverse -p {threads} 2>&1 >{log}"
 
 rule genome_cov_rc:
     input:
@@ -120,5 +121,5 @@ rule genome_cov_rc:
         "logs/genome_cov_{sample}_rc.log"
     threads: 4
     shell:
-        "bamCoverage -b {input} -o {output} -bs 1 --minMappingQuality 10 --minFragmentLength 18 --filterRNAstrand forward -p {threads}"
+        "bamCoverage -b {input} -o {output} -bs 1 --minMappingQuality 10 --minFragmentLength 18 --filterRNAstrand forward -p {threads} 2>&1 >{log}"
 
