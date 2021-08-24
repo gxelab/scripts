@@ -12,7 +12,6 @@ def get_fastq(wildcards):
 rule all:
     input:
         expand("mapped_reads/{sample}_Aligned.sortedByCoord.out.bam", sample=samples['sample']),
-        expand("mapped_reads/{sample}_Aligned.sortedByCoord.out.bam.bai", sample=samples['sample']),
         expand("genome_cov/{sample}.bw", sample=samples['sample']),
         expand("genome_cov/{sample}_fw.bw", sample=samples['sample']),
         expand("genome_cov/{sample}_rc.bw", sample=samples['sample']),
@@ -74,7 +73,8 @@ rule index_bam:
 
 rule quant_gene:
     input:
-        "mapped_reads/{sample}_Aligned.sortedByCoord.out.bam"
+        bam="mapped_reads/{sample}_Aligned.sortedByCoord.out.bam",
+        bai="mapped_reads/{sample}_Aligned.sortedByCoord.out.bam.bai"
     output:
         "quant/{sample}_gene.txt"
     log:
@@ -84,11 +84,12 @@ rule quant_gene:
         gtf=config['gtf'],
         stranded=config['stranded']
     shell:
-        "htseq-count -s {params.stranded} -t CDS -f bam {input} {params.gtf} >{output} 2>{log}"
+        "htseq-count -s {params.stranded} -t CDS -f bam {input.bai} {params.gtf} >{output} 2>{log}"
 
 rule quant_tx:
     input:
-        "mapped_reads/{sample}_Aligned.sortedByCoord.out.bam"
+        bam="mapped_reads/{sample}_Aligned.sortedByCoord.out.bam",
+        bai="mapped_reads/{sample}_Aligned.sortedByCoord.out.bam.bai"
     output:
         "quant/{sample}_tx.txt"
     log:
@@ -98,39 +99,42 @@ rule quant_tx:
         gtf=config['gtf'],
         stranded=config['stranded']
     shell:
-        "htseq-count -s {params.stranded} -t CDS -i transcript_id --nonunique all -f bam {input} {params.gtf} >{output} 2>{log}"
+        "htseq-count -s {params.stranded} -t CDS -i transcript_id --nonunique all -f bam {input.bam} {params.gtf} >{output} 2>{log}"
 
 rule genome_cov:
     input:
-        "mapped_reads/{sample}_Aligned.sortedByCoord.out.bam"
+        bam="mapped_reads/{sample}_Aligned.sortedByCoord.out.bam",
+        bai="mapped_reads/{sample}_Aligned.sortedByCoord.out.bam.bai"
     output:
         "genome_cov/{sample}.bw"
     log:
         "logs/genome_cov_{sample}.log"
     threads: 4
     shell:
-        "bamCoverage -b {input} -o {output} -bs 1 --minMappingQuality 10 --minFragmentLength 18 -p {threads}"
+        "bamCoverage -b {input.bam} -o {output} -bs 1 --minMappingQuality 10 --minFragmentLength 18 -p {threads}"
 
 
 rule genome_cov_fw:
     input:
-        "mapped_reads/{sample}_Aligned.sortedByCoord.out.bam"
+        bam="mapped_reads/{sample}_Aligned.sortedByCoord.out.bam",
+        bai="mapped_reads/{sample}_Aligned.sortedByCoord.out.bam.bai"
     output:
         "genome_cov/{sample}_fw.bw",
     log:
         "logs/genome_cov_{sample}_fw.log"
     threads: 4
     shell:
-        "bamCoverage -b {input} -o {output} -bs 1 --minMappingQuality 10 --minFragmentLength 18 --filterRNAstrand reverse -p {threads} 2>&1 >{log}"
+        "bamCoverage -b {input.bam} -o {output} -bs 1 --minMappingQuality 10 --minFragmentLength 18 --filterRNAstrand reverse -p {threads} 2>&1 >{log}"
 
 rule genome_cov_rc:
     input:
-        "mapped_reads/{sample}_Aligned.sortedByCoord.out.bam"
+        bam="mapped_reads/{sample}_Aligned.sortedByCoord.out.bam",
+        bai="mapped_reads/{sample}_Aligned.sortedByCoord.out.bam.bai"
     output:
         "genome_cov/{sample}_rc.bw"
     log:
         "logs/genome_cov_{sample}_rc.log"
     threads: 4
     shell:
-        "bamCoverage -b {input} -o {output} -bs 1 --minMappingQuality 10 --minFragmentLength 18 --filterRNAstrand forward -p {threads} 2>&1 >{log}"
+        "bamCoverage -b {input.bam} -o {output} -bs 1 --minMappingQuality 10 --minFragmentLength 18 --filterRNAstrand forward -p {threads} 2>&1 >{log}"
 
