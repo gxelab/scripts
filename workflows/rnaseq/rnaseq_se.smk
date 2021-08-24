@@ -11,6 +11,8 @@ def get_fastq(wildcards):
 
 rule all:
     input:
+        expand("mapped_reads/{sample}_Aligned.sortedByCoord.out.bam", sample=samples['sample']),
+        expand("mapped_reads/{sample}_Aligned.sortedByCoord.out.bam.bai", sample=samples['sample']),
         expand("genome_cov/{sample}.bw", sample=samples['sample']),
         expand("genome_cov/{sample}_fw.bw", sample=samples['sample']),
         expand("genome_cov/{sample}_rc.bw", sample=samples['sample']),
@@ -59,6 +61,15 @@ rule star_map:
         "STAR --runMode alignReads --genomeDir {params.star_idx} --readFilesIn {input} --readFilesCommand zcat "
         "--outFileNamePrefix {params.output_prefix} --runThreadN {threads} --outSAMtype BAM SortedByCoordinate "
         "--outSAMattributes All --limitBAMsortRAM 16000000000 2>&1 >{log}"
+
+rule index_bam:
+    input:
+        "mapped_reads/{sample}_Aligned.sortedByCoord.out.bam"
+    output:
+        "mapped_reads/{sample}_Aligned.sortedByCoord.out.bam.bai"
+    threads: 1
+    shell:
+        "samtools index {input}"
 
 
 rule quant_gene:
