@@ -81,10 +81,12 @@ rule quant_gene:
     threads: 1
     params:
         gtf=config['gtf'],
-        stranded=config['stranded']
+        stranded=config['stranded'],
+        rlen_lower=config['rlen_lower'],
+        rlen_upper=config['rlen_upper']
     shell:
-        "featureCounts -t CDS -Q 10 -s 1 -a {params.gtf} -o {output} {input.bam} 2>&1 >{log}"
-        "htseq-count -s {params.stranded} -t CDS -f bam {input.bai} {params.gtf} >{output} 2>{log}"
+        "python scripts/bam_filter.py -l {params.rlen_lower} -u {params.rlen_upper} -q 10 {input.bam} | "
+        "featureCounts -t CDS -Q 10 -s 1 -a {params.gtf} -o {output} 2>{log}"
 
 rule quant_tx:
     input:
@@ -97,9 +99,12 @@ rule quant_tx:
     threads: 1
     params:
         gtf=config['gtf'],
-        stranded=config['stranded']
+        stranded=config['stranded'],
+        rlen_lower=config['rlen_lower'],
+        rlen_upper=config['rlen_upper']
     shell:
-        "htseq-count -s {params.stranded} -t CDS -i transcript_id --nonunique all -f bam {input.bam} {params.gtf} >{output} 2>{log}"
+        "python scripts/bam_filter.py -l {params.rlen_lower} -u {params.rlen_upper} -q 10 {input.bam} | "
+        "featureCounts -t CDS -g transcript_id -O -Q 10 -s 1 -a {params.gtf} -o {output} 2>{log}"
 
 rule genome_cov:
     input:
@@ -112,7 +117,10 @@ rule genome_cov:
         "logs/genome_cov_{sample}.log"
     threads: 4
     params:
-        outprefix="genome_cov/{sample}"
+        outprefix="genome_cov/{sample}",
+        poffset=config['poffset'],
+        rlen_lower=config['rlen_lower'],
+        rlen_upper=config['rlen_upper']
     shell:
-        "python scripts/bam_coverage.py -p 12 -l 25 -u 34 {input.bam} {params.outprefix}"
+        "python scripts/bam_coverage.py -p {params.poffset} -l {params.rlen_lower} -u {params.rlen_upper} {input.bam} {params.outprefix}"
 

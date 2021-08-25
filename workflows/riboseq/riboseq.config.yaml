@@ -1,6 +1,9 @@
 sample_list: riboseq.samples.tsv
 bt2_idx: bt2_idx_prefix
 star_idx: star_idx_dir
-stranded: "yes"
+stranded: 1
+rlen_lower: 25
+rlen_upper: 34
+poffset: 12
 gtf: genome.gtf
 
