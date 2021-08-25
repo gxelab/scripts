@@ -1,5 +1,5 @@
 ##### snakemake workflow for RNA-Seq (single-end)
-To use this workflow, put sample information in the `rnaseq_se.samples.txt` following the example file.
+To use this workflow, put sample information in the `rnaseq_se.samples.tsv` following the example file.
 If you do not need some of the output files, you can comment out the corresponding lines in rule `all`.
 
 ##### How to run this worflow
