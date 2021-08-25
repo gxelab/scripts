@@ -1,10 +1,4 @@
 """
-Calculate BAM coverage for Ribo-Seq data
-
-Validation:
-Both plastid (SYQ) and this script was ran for a single Ribo-Seq library. For
-sites with non-zero coverage, this script gave exactly the same counts for most
-sites. The counts are different for only 0.017% sites most likely due to indels.
 
 ----------------------------------------
 @author: zh (mt1022)
