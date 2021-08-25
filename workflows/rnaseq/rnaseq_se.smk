@@ -111,7 +111,7 @@ rule genome_cov:
         "logs/genome_cov_{sample}.log"
     threads: 4
     shell:
-        "bamCoverage -b {input.bam} -o {output} -bs 1 --minMappingQuality 10 --minFragmentLength 18 -p {threads}"
+        "bamCoverage -b {input.bam} -o {output} -bs 1 --minMappingQuality 10 --minFragmentLength 18 -p {threads} 2>&1 >{log}"
 
 
 rule genome_cov_fw:
