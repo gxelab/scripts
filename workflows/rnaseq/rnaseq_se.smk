@@ -85,7 +85,7 @@ rule quant_gene:
         stranded=config['stranded']
     shell:
         # "featureCounts -t CDS -Q 10 -s 1 -a {params.gtf} -o {output} {input.bam} 2>{log}"
-        "htseq-count -s {params.stranded} -t CDS -f bam {input.bai} {params.gtf} >{output} 2>{log}"
+        "htseq-count -s {params.stranded} -t CDS -f bam {input.bam} {params.gtf} >{output} 2>{log}"
 
 rule quant_tx:
     input:
