@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 """
 Operations on genomic intervals stored in GTF file
---------------------------------------------------------------
+
+note: At least for Ensembl GTF, stop codon is not part of the CDS
+-----------------------------------------------------------------
 @author: zh (mt1022)
 @date: Fri Aug 27 2021
 """
@@ -10,152 +12,108 @@ import sys
 import re
 import gzip
 import fileinput
+from dataclasses import dataclass
+
+
+@dataclass
+class Region:
+    start: int
+    end: int
+    strand: str = '+'
+    
+    def __post_init__(self):
+        if self.start > self.end:
+            raise ValueError('Invalid region boundary!')
+
+    def __len__(self):
+        return self.end - self.start + 1
+
+
+@dataclass
+class Gene:
+    id: str
+    name: str = ''
 
 
 class Transcript:
-    def __init__(self, mrna_id, gene_id, mrna_chr, strand, desp):
-        self.id = mrna_id
-        self.gene = gene_id
-        self.chr = mrna_chr
-        self.strand = strand
-        self.exon_starts = []
-        self.exon_ends = []
-        self.cds_starts = []
-        self.cds_ends = []
-        self.utr5_starts = []
-        self.utr5_ends = []
-        self.utr3_starts = []
-        self.utr3_ends = []
-        self.start_codon = []
+    def __init__(slef, tx_id: str, gene: Gene, strand: str='+'):
+        self.tx_id = tx_id
+        self.gene = gene
+        self.strand = self.strand
+        self.exons = []
+        self.cdss = []
         self.stop_codon = []
-        self.desp = desp
 
     def __len__(self):
-        length = 0
-        nregion = len(self.exon_starts)
-        for i in range(nregion):
-            length += self.exon_ends[i] - self.exon_starts[i] + 1
-        return(length)
+        return sum(len(i) for i in self.exons)
+
+    def n_exons(self):
+        return len(self.exons)
 
     def cds_len(self):
-        length = 0
-        nregion = len(self.cds_starts)
-        for i in range(nregion):
-            length += self.cds_ends[i] - self.cds_starts[i] + 1
-        return(length)
+        return sum(len(i) for i in self.cdss)
 
-    def add_feature(self, feature):
-        if feature[0] == 'exon':
-            self.exon_starts.append(feature[1])
-            self.exon_ends.append(feature[2])
-        elif feature[0] == 'CDS':
-            self.cds_starts.append(feature[1])
-            self.cds_ends.append(feature[2])
-        elif feature[0] == '5UTR':
-            self.utr5_starts.append(feature[1])
-            self.utr5_ends.append(feature[2])
-        elif feature[0] == '3UTR':
-            self.utr3_starts.append(feature[1])
-            self.utr3_ends.append(feature[2])
-        elif feature[0] == 'start_codon':
-            self.start_codon.append([x for x in feature[1:]])
-        elif feature[0] == 'stop_codon':
-            self.stop_codon.append([x for x in feature[1:]])
+    def tx_start(self):
+        if strand is '+':
+            return self.exons[0].start
         else:
-            pass
-            # ensembl GTF have 'transcript' and 'gene' feature
-            # print("error")
-        return
+            return self.exons[-1].end
 
-    def get_transcript_start(self):
-        """
-        get genomic coordinate of transcript start
-        """
-        pos = -1
-        if self.strand == '+':
-            pos = sorted(self.exon_starts)[0]
+    def tx_end(self):
+        if strand is '+':
+            return self.exons[-1].end
         else:
-            pos = sorted(self.exon_ends)[-1]
-        return(pos)
+            return self.exons[0].start
 
-    def get_transcript_end(self):
-        """
-        get genomic coordinate of transcript end
-        """
-        pos = -1
-        if self.strand == '+':
-            pos = sorted(self.exon_ends)[-1]
+    def cds_start(self):
+        if strand is '+':
+            return self.cdss[0].start
         else:
-            pos = sorted(self.exon_starts)[0]
-        return(pos)
+            return self.cdss[-1].end
 
-    def get_cds_start(self):
-        """
-        get genomic coordinate of CDS start
-        """
-        cds_starts = self.cds_starts
-        cds_ends = self.cds_ends
-        cds_starts.sort()
-        cds_ends.sort()
-
-        if self.strand == '+':
-            return(cds_starts[0])
+    def cds_end(self):
+        if strand is '+':
+            return self.cdss[-1].end
         else:
-            return(cds_ends[-1])
+            return self.cds[0].start
 
-    def get_cds_end(self):
-        """
-        get genomic coordinate of CDS end
-        """
-        cds_starts = self.cds_starts
-        cds_ends = self.cds_ends
-        cds_starts.sort()
-        cds_ends.sort()
-
-        if self.strand == '+':
-            return(cds_ends[-1])
+    def get_introns(self):
+        if len(self.exons) == 1:
+            return []
         else:
-            return(cds_starts[0])
-
-    def get_intron_starts(self):
-        """
-        get start position of all introns
-        """
-        if self.strand == '+':
-            return([int(x) + 1 for x in self.exon_ends[:-1]])
-        else:
-            return([int(x) - 1 for x in self.exon_starts[1:]])
-
-    def get_intron_ends(self):
-        """
-        get end position of all introns
-        """
-        if self.strand == '+':
-            return([int(x) - 1 for x in self.exon_starts[1:]])
-        else:
-            return([int(x) + 1 for x in self.exon_ends[:-1]])
+            return [Region(self.exons[i].end + 1, self.exons[i+1].start - 1, self.strand)
+                    for i in range(len(self.exons) - 1)]
 
     def tpos_to_gpos(self, pos):
-        """
-        transform transcript coordinate to genomic coordinate
-        """
-        index = pos
-        nregion = len(self.exon_starts)
-        exon_starts = sorted(self.exon_starts)
-        exon_ends = sorted(self.exon_ends)
-        if self.strand == '+':
-            for i in range(nregion):
-                if exon_ends[i] - exon_starts[i] + 1 < index:
-                    index -= exon_ends[i] - exon_starts[i] + 1
-                elif exon_ends[i] - exon_starts[i] + 1 >= index:
-                    return(exon_starts[i] + index - 1)
+        if pos < 1:
+            return 0
+        elif pos > len(self):
+            return - 1
         else:
-            for i in reversed(range(nregion)):
-                if exon_ends[i] - exon_starts[i] + 1 < index:
-                    index -= exon_ends[i] - exon_starts[i] + 1
-                elif exon_ends[i] - exon_starts[i] + 1 >= index:
-                    return(exon_ends[i] - index + 1)
+            if self.strand is '-':
+                pos = len(self) - pos + 1
+            for i in range(len(self.exons)):
+                if len(self.exons[i]) < index:
+                    index  -= len(self.exons[i])
+                else:
+                    return self.exons[i].start + index - 1
 
+    def gpos_to_tpos(self, pos):
+        if pos < self.exons[0].start:
+            tpos = self.exons[0].start - pos
+            ptype = 'upstream' if self.strand == '+' else 'downstream'
+        elif pos > self.exons[-1].end:
+            tpos = pos - self.exons.end[-1]
+            ptype = 'downstream' if self.strand is '+' else 'upstream'
+        else:
+            tpos = 0
+            # TODO: how to deal with introns?
+            for in in range(self.n_exons()):
+                if self.exons[i].start <= tpos:
+                    if self.exons[i].end <= pos:
+
+
+#------------------------------------------------------------------------------------------
     def gpos_to_tpos(self, pos):
         """
         transform genomic coordinate to transcript coordinate
