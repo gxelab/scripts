@@ -13,13 +13,14 @@ import re
 import gzip
 import fileinput
 from dataclasses import dataclass
+from typing import List
 
 
 @dataclass
 class Region:
     start: int
     end: int
-    strand: str = '+'
+    # strand: str = '+'
     
     def __post_init__(self):
         if self.start > self.end:
@@ -31,19 +32,34 @@ class Region:
 
 @dataclass
 class Gene:
-    id: str
-    name: str = ''
-
+    gene_id: str
+    # name: str = ''
+    chrom: str = ''
+    strand: str = '+'
 
 class Transcript:
-    def __init__(slef, tx_id: str, gene: Gene, strand: str='+'):
-        self.tx_id = tx_id
-        self.gene = gene
-        self.strand = self.strand
-        self.exons = []
-        self.cdss = []
-        self.stop_codon = []
-
+    def __init__(self, tx_id: str, gene: Gene):
+        self.tx_id: str = tx_id
+        self.Gene: Gene = gene
+        self.exons: List[Region] = []
+        self.cdss: List[Region] = []
+        self.stop_codon: List[Region] = []
+    
+    def add_region(self, region, region_type):
+        if region_type == 'exon':
+            self.exons.append(region)
+        elif region_type == 'CDS':
+            self.cdss.append(region)
+        elif region_type == 'stop_codon':
+            self.cdss.append(region)
+        return
+    
+    def update(self):
+        self.exons = sorted(self.exons, key=lambda r: r.start)
+        self.cdss = sorted(self.exons, key=lambda r: r.start)
+        self.stop_codon = sorted(self.exons, key=lambda r: r.start)
+        return
+    
     def __len__(self):
         return sum(len(i) for i in self.exons)
 
@@ -232,25 +248,36 @@ def GTFparse(gtf_file):
     """
     read GTF file
     """
-    all_transcript = {}
+    gtf_file = '/home/mt1022/Downloads/Homo_sapiens.GRCh38.104.chr.gtf.gz'
+    gtf = {}
     if gtf_file.endswith('.gz'):
         f = gzip.open(gtf_file, 'rt')
     else:
         f = open(gtf_file)
+
+    n = 0
     for line in f:
+        n += 1
+        if n > 100:
+            break
         if line[0] == '#':
             continue
         ary = line.strip().split('\t')
         m = re.search(r'gene_id "(.*?)".*?transcript_id "(.*?)"', ary[8])
         if m:
-            if m.group(2) in all_transcript:
-                all_transcript[m.group(2)].add_feature([ary[2], int(ary[3]), int(ary[4])])
+            if m.group(2) in gtf:
+                gtf[m.group(2)].add_region(region = Region(int(ary[3]), int(ary[4])), region_type=ary[2])
             else:
-                mrna = Transcript(m.group(2), m.group(1), ary[0], ary[6], ary[8])
-                mrna.add_feature([ary[2], int(ary[3]), int(ary[4])])
-                all_transcript[m.group(2)] = mrna
+                gene = Gene(gene_id=m.group(1), chrom=ary[0], strand=ary[6])
+                tx = Transcript(tx_id=m.group(2), gene=gene)
+                tx.add_region(region = Region(int(ary[3]), int(ary[4])), region_type=ary[2])
+                gtf[m.group(2)] = tx
+    
     f.close()
-    return(all_transcript)
+    for tx in gtf:
+        gtf[tx].update()
+        
+    return gtf
 
 
 def longest_transcript(gtf_file, p=True):
