@@ -12,6 +12,7 @@ note:
 @date: Fri Aug 27 2021
 """
 import sys
+import argparse
 import re
 import gzip
 import fileinput
@@ -19,6 +20,10 @@ import csv
 from dataclasses import dataclass
 from typing import List
 
+
+###############################################################################
+# class definiton #############################################################
+###############################################################################
 
 @dataclass
 class Region:
@@ -135,7 +140,12 @@ class Transcript:
             return [Region(self.exons[i].end + 1, self.exons[i+1].start - 1)
                     for i in range(self.n_exons - 1)]
 
-    def tpos_to_gpos(self, pos):
+    def tpos_to_gpos(self, pos: int):
+        """
+        transform transcript coordinate to genomic coordinate
+
+        param pos: int, position on transcript, 1-based.
+        """
         if pos < 1:
             return 0
         elif pos > len(self):
@@ -150,6 +160,11 @@ class Transcript:
                     return self.exons[i].start + pos - 1
 
     def gpos_to_tpos(self, pos):
+        """
+        transform genomic coordinate to transcript coordinate
+        
+        param pos: int, position on genome, 1-based.
+        """
         if pos < self.exons[0].start:
             tpos = self.exons[0].start - pos
             ptype = 'upstream' if self.gene.strand == '+' else 'downstream'
@@ -183,6 +198,8 @@ class Transcript:
     def cpos_to_gpos(self, pos):
         """
         transform CDS coordinate to genomic coordinate
+
+        param pos: int position on CDS, 1-based.
         """
         tpos = self.gpos_to_tpos(self.cds_start)[0] + pos - 1
         gpos = self.tpos_to_gpos(tpos)
@@ -191,6 +208,8 @@ class Transcript:
     def gpos_to_cpos(self, pos):
         """
         transform genomic coordinate to CDS coordinate
+
+        param: int, position on genome, 1-based.
         """
         tpos = self.gpos_to_tpos(pos)[0]
         cpos = tpos - self.gpos_to_tpos(self.cds_start)[0] + 1
@@ -202,6 +221,9 @@ class Transcript:
         given transcript region boundary:
         return one or more(for features spanning more than one exon)
         exonic region interval(s) in list of string interval
+
+        param pos1: int, left transcript coordinate, 1-based.
+        param pos2: int, right transcript coordinate, 1-based.
         """
         cod1 = self.tpos_to_gpos(pos1)
         cod2 = self.tpos_to_gpos(pos2)
@@ -243,16 +265,12 @@ class Transcript:
             else:
                 return self.tiv_to_giv(self.gpos_to_tpos(self.cds_end)[0] + 1, len(self))
     
-    def get_txinfo(self):
-        """
-        Transcript information
-        """
-        pass
-    
-    def format_region_bed(self, r):
-        pass
-    
     def format_region_bed12(self, rs):
+        """
+        format a spliced region in a transcript into bed12 format
+
+        param rs: a list of items of class Region
+        """
         rs = sorted(rs, key=lambda r: r.start)
         starts = [r.start - 1 for r in rs]
         ends = [r.end for r in rs]
@@ -265,16 +283,21 @@ class Transcript:
         s = s + [','.join(blocksize) + ',', ','.join(blockstart) + ',']
         return s
 
+
 ###############################################################################
 # functions ###################################################################
 ###############################################################################
 def parse_gtf(gtf_file):
     """
     read GTF file
+
+    param: path to GTF file, gzipped format allowed.
     """
     gtf = {}
     if gtf_file.endswith('.gz'):
         f = gzip.open(gtf_file, 'rt')
+    elif gtf_file == '-':
+        f = sys.stdin
     else:
         f = open(gtf_file)
 
@@ -300,16 +323,28 @@ def parse_gtf(gtf_file):
 
 
 def exon_to_bed(gtf_file):
+    """
+    print exons of each transcript in bed12 format
+
+    param: path to GTF file, gzipped format allowed.
+    """
     gtf = parse_gtf(gtf_file)
-    for tx in gtf:
+    for tx_id in gtf:
+        tx = gtf[tx_id]
         items = tx.format_region_bed12(self.exons)
         print('\t'.join(str(i) for i in items))
     return
 
 
 def cds_to_bed(gtf_file):
+    """
+    print CDSs of each transcript in bed12 format
+
+    param: path to GTF file, gzipped format allowed.
+    """
     gtf = parse_gtf(gtf_file)
-    for tx in gtf:
+    for tx_id in gtf:
+        tx = gtf[tx_id]
         if len(tx.cdss) > 0:
             items = tx.format_region_bed12(self.cdss)
             print('\t'.join(str(i) for i in items))
@@ -317,8 +352,14 @@ def cds_to_bed(gtf_file):
 
 
 def utr5_to_bed(gtf_file):
+    """
+    print UTR5 of each transcript in bed12 format
+
+    param: path to GTF file, gzipped format allowed.
+    """
     gtf = parse_gtf(gtf_file)
-    for tx in gtf:
+    for tx_id in gtf:
+        tx = gtf[tx_id]
         tx_utr5 = tx.five_prime_utrs
         if len(tx_utr5) > 0:
             items = tx.format_region_bed12(tx_utr5)
@@ -327,8 +368,14 @@ def utr5_to_bed(gtf_file):
 
 
 def utr3_to_bed(gtf_file):
+    """
+    print UTR3 of each transcript in bed12 format
+
+    param: path to GTF file, gzipped format allowed.
+    """
     gtf = parse_gtf(gtf_file)
-    for tx in gtf:
+    for tx_id in gtf:
+        tx = gtf[tx_id]
         tx_utr3 = tx.three_prime_utrs
         if len(tx_utr3) > 0:
             items = tx.format_region_bed12(tx_utr3)
@@ -338,6 +385,9 @@ def utr3_to_bed(gtf_file):
 
 def t2g(gtf_file, tfile):
     """
+    convert transcript coordinates to genomic coordinates
+    
+    param: path to GTF file, gzipped format allowed.
     param tfile: tab-delimited file, 1st column=tx, 2nd column = tpos
     """
     gtf = parse_gtf(gtf_file)
@@ -356,6 +406,9 @@ def t2g(gtf_file, tfile):
 
 def g2t(gtf_file, gfile):
     """
+    convert genomic coordinates ot transcript coordinates
+
+    param: path to GTF file, gzipped format allowed.
     param gfile: tab-delimited file, 1st column=tx, 2nd column = gpos
     """
     gtf = parse_gtf(gtf_file)
@@ -374,6 +427,9 @@ def g2t(gtf_file, gfile):
 
 def tiv2giv(gtf_file, tivfile):
     """
+    convert transcript intervals to genomic intervals
+
+    param: path to GTF file, gzipped format allowed.
     param tivfile: tab-delimited, first three columns are tx_id, start, and end, 1-based
     """
     gtf = parse_gtf(gtf_file)
@@ -390,6 +446,9 @@ def tiv2giv(gtf_file, tivfile):
 
 def giv2tiv(gtf_file, givfile):
     """
+    convert genomic intervals to transcript intervals
+
+    param: path to GTF file, gzipped format allowed.
     param givfile: tab-delimited, first three columns are tx_id, start, and end, 1-based
     """
     gtf = parse_gtf(gtf_file)
@@ -414,12 +473,16 @@ def giv2tiv(gtf_file, givfile):
 
 def tx_info(gtf_file):
     """
+    print summary information of each transcript
+
+    param: path to GTF file, gzipped format allowed.
     note: stop codon is counted for CDS length, so that cds + utr5 + utr3 = transcript length
     """
     gtf = parse_gtf(gtf_file)
     header = ['tx_id', 'gene_id', 'chrom', 'strand', 'len', 'len_cds', 'len_utr5', 'len_utr3']
     print('\t'.join(header))
-    for tx in gtf:
+    for tx_id in gtf:
+        tx = gtf[tx_id]
         out = [tx.tx_id, tx.gene.gene_id, tx.gene.chrom, tx.gene.strand]
         len_tx = len(tx)
         len_utr5 = sum(len(i) for i in tx.five_prime_utrs)
@@ -430,27 +493,62 @@ def tx_info(gtf_file):
     return
 
 
-#if __name__ == "__main__":
-#    parser = argparse.ArgumentParser(
-#        prog='GTFtools.py',
-#        description='GTF file manipulation')
-#    # run mode
-#    parser.add_argument(
-#        '-M', '--runMode',
-#        help='select a subfunction to run',
-#        choices=['longest_transcript', 'tssFlank'])
-#    # gtf input
-#    parser.add_argument(
-#        '-g', '--gtf',
-#        type=argparse.FileType('r'),
-#        help='input gtf file',
-#        default=sys.stdin)
-#    parser.add_argument(
-#        '-l', '--length',
-#        type=int,
-#        help='length')
-#    parser.add_argument(
-#        '-d', '--downstreamLen',
-#        type=int,
-#        help='length of downstream to extract')
-#    args = parser.parse_args()
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        prog='GTFtools.py',
+        description='GTF file manipulation')
+    parser.add_argument(
+        '-g', '--gtf',
+        type=str, default='-',
+        help='input gtf file')
+    
+    # subparsers
+    subparsers = parser.add_subparsers(title='GTF operations',
+            help='supported operations', dest='subcmd')
+
+    parser_txinfo = subparsers.add_parser('txinfo', help='summary information of each transcript')
+
+    parser_tobed = subparsers.add_parser('convert2bed', help='convert GTF to bed12 format')
+    parser_tobed.add_argument('-t', '--type',
+            type=str, default='exon',
+            choices=['exon', 'cds', 'utr5', 'utr3'],
+            help='types of intervals to be converted to bed for each transcript')
+    
+    parser_t2g = subparsers.add_parser('t2g', help='convert tpos to gpos')
+    parser_t2g.add_argument('-i', '--infile', type = str,
+            help='tab-delimited file with the first two columns composed of tx_id and transcript coordinates')
+
+    parser_g2t = subparsers.add_parser('g2t', help='convert gpos to tpos')
+    parser_g2t.add_argument('-i', '--infile', type = str,
+            help='tab-delimited file with the first two columns composed of tx_id and genomic coordinates')
+    
+    parser_tiv2giv = subparsers.add_parser('tiv2giv', help='convert tiv to giv')
+    parser_tiv2giv.add_argument('-i', '--infile', type = str,
+            help='tab-delimited file with the first three columns composed of tx_id, start and end coordinates')
+
+    parser_giv2tiv = subparsers.add_parser('giv2tiv', help='convert giv to tiv')
+    parser_giv2tiv.add_argument('-i', '--infile', type = str,
+            help='tab-delimited file with the first three columns composed of tx_id, start and end coordinates')
+
+    args = parser.parse_args()
+    if args.subcmd == 'convert2bed':
+        if args.type == 'exon':
+            exon_to_bed(args.gtf)
+        elif args.type == 'cds':
+            cds_to_bed(args.gtf)
+        elif args.type == 'utr5':
+            utr5_to_bed(args.gtf)
+        else:
+            utr3_to_bed(args.gtf)
+    elif args.subcmd == 'txinfo':
+        tx_info(args.gtf)
+    elif args.subcmd == 't2g':
+        t2g(gtf=args.gtf, tfile=args.infile)
+    elif args.subcmd == 'g2t':
+        g2t(gtf=args.gtf, gfile=args.infile)
+    elif args.subcmd == 'tiv2giv':
+        tiv2giv(gtf=args.gtf, tivfile=args.infile)
+    elif args.subcmd == 'giv2tiv':
+        giv2tiv(gtf=args.gtf, givfile=args.infile)
+
+
