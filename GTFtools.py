@@ -331,7 +331,7 @@ def exon_to_bed(gtf_file):
     gtf = parse_gtf(gtf_file)
     for tx_id in gtf:
         tx = gtf[tx_id]
-        items = tx.format_region_bed12(self.exons)
+        items = tx.format_region_bed12(tx.exons)
         print('\t'.join(str(i) for i in items))
     return
 
@@ -346,7 +346,7 @@ def cds_to_bed(gtf_file):
     for tx_id in gtf:
         tx = gtf[tx_id]
         if len(tx.cdss) > 0:
-            items = tx.format_region_bed12(self.cdss)
+            items = tx.format_region_bed12(tx.cdss)
             print('\t'.join(str(i) for i in items))
     return
 
