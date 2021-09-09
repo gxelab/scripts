@@ -17,6 +17,18 @@ rule all:
         expand("quant/{sample}_gene.txt", sample=samples['sample']),
         expand("quant/{sample}_tx.txt", sample=samples['sample']),
 
+
+rule pseudotx:
+    input:
+        gtf=config['gtf'],
+        genome=config['genome']
+    output:
+        "psite/pseudotx.fa"
+    threads: 1
+    run:
+        shell("python scripts/GTFtools.py convert2bed -g {genome} -t cds -e 30 | "
+              "bedtools getfasta -nameOnly -fi {genome} -bed stdin >{output}")
+
 rule cutadapt_trim:
     input:
         get_fastq

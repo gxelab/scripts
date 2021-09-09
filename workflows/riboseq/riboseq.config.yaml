@@ -6,4 +6,5 @@ rlen_lower: 25
 rlen_upper: 34
 poffset: 12
 gtf: genome.gtf
+genome: genome.fa
 
