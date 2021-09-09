@@ -494,41 +494,51 @@ def tx_info(gtf_file):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        prog='GTFtools.py',
-        description='GTF file manipulation')
-    parser.add_argument(
-        '-g', '--gtf',
-        type=str, default='-',
-        help='input gtf file')
+    # parent parser that holds common argument
+    parent_parser = argparse.ArgumentParser(add_help=False)
+    parent_parser.add_argument('-g', '--gtf',
+            type=str, default='-', help='input gtf file')
     
-    # subparsers
+    
+    # main parser with subparsers
+    parser = argparse.ArgumentParser(prog='GTFtools.py',
+            description='GTF file manipulation')
     subparsers = parser.add_subparsers(title='GTF operations',
             help='supported operations', dest='subcmd')
 
-    parser_txinfo = subparsers.add_parser('txinfo', help='summary information of each transcript')
+    parser_txinfo = subparsers.add_parser('txinfo',
+            help='summary information of each transcript')
 
-    parser_tobed = subparsers.add_parser('convert2bed', help='convert GTF to bed12 format')
+    parser_tobed = subparsers.add_parser('convert2bed',
+            help='convert GTF to bed12 format', parents=[parent_parser])
     parser_tobed.add_argument('-t', '--type',
             type=str, default='exon',
             choices=['exon', 'cds', 'utr5', 'utr3'],
             help='types of intervals to be converted to bed for each transcript')
     
-    parser_t2g = subparsers.add_parser('t2g', help='convert tpos to gpos')
+    parser_t2g = subparsers.add_parser('t2g',
+            help='convert tpos to gpos', parents=[parent_parser])
     parser_t2g.add_argument('-i', '--infile', type = str,
-            help='tab-delimited file with the first two columns composed of tx_id and transcript coordinates')
+            help='tab-delimited file with the first two columns composed of'
+            'tx_id and transcript coordinates')
 
-    parser_g2t = subparsers.add_parser('g2t', help='convert gpos to tpos')
+    parser_g2t = subparsers.add_parser('g2t',
+            help='convert gpos to tpos', parents=[parent_parser])
     parser_g2t.add_argument('-i', '--infile', type = str,
-            help='tab-delimited file with the first two columns composed of tx_id and genomic coordinates')
+            help='tab-delimited file with the first two columns composed of '
+            'tx_id and genomic coordinates')
     
-    parser_tiv2giv = subparsers.add_parser('tiv2giv', help='convert tiv to giv')
+    parser_tiv2giv = subparsers.add_parser('tiv2giv',
+            help='convert tiv to giv', parents=[parent_parser])
     parser_tiv2giv.add_argument('-i', '--infile', type = str,
-            help='tab-delimited file with the first three columns composed of tx_id, start and end coordinates')
+            help='tab-delimited file with the first three columns composed of '
+            'tx_id, start and end coordinates')
 
-    parser_giv2tiv = subparsers.add_parser('giv2tiv', help='convert giv to tiv')
+    parser_giv2tiv = subparsers.add_parser('giv2tiv',
+            help='convert giv to tiv', parents=[parent_parser])
     parser_giv2tiv.add_argument('-i', '--infile', type = str,
-            help='tab-delimited file with the first three columns composed of tx_id, start and end coordinates')
+            help='tab-delimited file with the first three columns composed of '
+            'tx_id, start and end coordinates')
 
     args = parser.parse_args()
     if args.subcmd == 'convert2bed':
