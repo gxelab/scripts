@@ -265,13 +265,17 @@ class Transcript:
             else:
                 return self.tiv_to_giv(self.gpos_to_tpos(self.cds_end)[0] + 1, len(self))
     
-    def format_region_bed12(self, rs):
+    def format_region_bed12(self, rs, flank=0):
         """
         format a spliced region in a transcript into bed12 format
 
         param rs: a list of items of class Region
         """
         rs = sorted(rs, key=lambda r: r.start)
+        if flank > 0:
+            rs[0].start -= flank
+            rs[-1].end += flank
+
         starts = [r.start - 1 for r in rs]
         ends = [r.end for r in rs]
 
@@ -322,7 +326,7 @@ def parse_gtf(gtf_file):
 
 
 
-def exon_to_bed(gtf_file):
+def exon_to_bed(gtf_file, extend=0):
     """
     print exons of each transcript in bed12 format
 
@@ -331,12 +335,12 @@ def exon_to_bed(gtf_file):
     gtf = parse_gtf(gtf_file)
     for tx_id in gtf:
         tx = gtf[tx_id]
-        items = tx.format_region_bed12(tx.exons)
+        items = tx.format_region_bed12(tx.exons, flank=extend)
         print('\t'.join(str(i) for i in items))
     return
 
 
-def cds_to_bed(gtf_file):
+def cds_to_bed(gtf_file, extend=0):
     """
     print CDSs of each transcript in bed12 format
 
@@ -346,12 +350,12 @@ def cds_to_bed(gtf_file):
     for tx_id in gtf:
         tx = gtf[tx_id]
         if len(tx.cdss) > 0:
-            items = tx.format_region_bed12(tx.cdss)
+            items = tx.format_region_bed12(tx.cdss, flank=extend)
             print('\t'.join(str(i) for i in items))
     return
 
 
-def utr5_to_bed(gtf_file):
+def utr5_to_bed(gtf_file, extend=0):
     """
     print UTR5 of each transcript in bed12 format
 
@@ -367,7 +371,7 @@ def utr5_to_bed(gtf_file):
     return
 
 
-def utr3_to_bed(gtf_file):
+def utr3_to_bed(gtf_file, extend=0):
     """
     print UTR3 of each transcript in bed12 format
 
@@ -378,7 +382,7 @@ def utr3_to_bed(gtf_file):
         tx = gtf[tx_id]
         tx_utr3 = tx.three_prime_utrs
         if len(tx_utr3) > 0:
-            items = tx.format_region_bed12(tx_utr3)
+            items = tx.format_region_bed12(tx_utr3, flank=extend)
             print('\t'.join(str(i) for i in items))
     return
 
@@ -502,54 +506,63 @@ if __name__ == "__main__":
     
     # main parser with subparsers
     parser = argparse.ArgumentParser(prog='GTFtools.py',
-            description='GTF file manipulation')
+        description='GTF file manipulation')
     subparsers = parser.add_subparsers(title='GTF operations',
-            help='supported operations', dest='subcmd')
+        help='supported operations', dest='subcmd')
 
     parser_txinfo = subparsers.add_parser('txinfo',
-            help='summary information of each transcript')
+        help='summary information of each transcript',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     parser_tobed = subparsers.add_parser('convert2bed',
-            help='convert GTF to bed12 format', parents=[parent_parser])
+        help='convert GTF to bed12 format', parents=[parent_parser],
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser_tobed.add_argument('-t', '--type',
-            type=str, default='exon',
-            choices=['exon', 'cds', 'utr5', 'utr3'],
-            help='types of intervals to be converted to bed for each transcript')
+        type=str, default='exon',
+        choices=['exon', 'cds', 'utr5', 'utr3'],
+        help='types of intervals to be converted to bed for each transcript')
+    parser_tobed.add_argument('-e', '--extend',
+        type=int, default=0,
+        help='number of bases to extend at both sides')
     
     parser_t2g = subparsers.add_parser('t2g',
-            help='convert tpos to gpos', parents=[parent_parser])
+        help='convert tpos to gpos', parents=[parent_parser],
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser_t2g.add_argument('-i', '--infile', type = str,
-            help='tab-delimited file with the first two columns composed of'
-            'tx_id and transcript coordinates')
+        help='tab-delimited file with the first two columns composed of'
+        'tx_id and transcript coordinates')
 
     parser_g2t = subparsers.add_parser('g2t',
-            help='convert gpos to tpos', parents=[parent_parser])
+        help='convert gpos to tpos', parents=[parent_parser],
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser_g2t.add_argument('-i', '--infile', type = str,
-            help='tab-delimited file with the first two columns composed of '
-            'tx_id and genomic coordinates')
+        help='tab-delimited file with the first two columns composed of '
+        'tx_id and genomic coordinates')
     
     parser_tiv2giv = subparsers.add_parser('tiv2giv',
-            help='convert tiv to giv', parents=[parent_parser])
+        help='convert tiv to giv', parents=[parent_parser],
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser_tiv2giv.add_argument('-i', '--infile', type = str,
-            help='tab-delimited file with the first three columns composed of '
-            'tx_id, start and end coordinates')
+        help='tab-delimited file with the first three columns composed of '
+        'tx_id, start and end coordinates')
 
     parser_giv2tiv = subparsers.add_parser('giv2tiv',
-            help='convert giv to tiv', parents=[parent_parser])
+        help='convert giv to tiv', parents=[parent_parser],
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser_giv2tiv.add_argument('-i', '--infile', type = str,
-            help='tab-delimited file with the first three columns composed of '
-            'tx_id, start and end coordinates')
+        help='tab-delimited file with the first three columns composed of '
+        'tx_id, start and end coordinates')
 
     args = parser.parse_args()
     if args.subcmd == 'convert2bed':
         if args.type == 'exon':
-            exon_to_bed(args.gtf)
+            exon_to_bed(args.gtf, args.extend)
         elif args.type == 'cds':
-            cds_to_bed(args.gtf)
+            cds_to_bed(args.gtf, args.extend)
         elif args.type == 'utr5':
-            utr5_to_bed(args.gtf)
+            utr5_to_bed(args.gtf, args.extend)
         else:
-            utr3_to_bed(args.gtf)
+            utr3_to_bed(args.gtf, args.extend)
     elif args.subcmd == 'txinfo':
         tx_info(args.gtf)
     elif args.subcmd == 't2g':
