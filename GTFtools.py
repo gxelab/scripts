@@ -566,12 +566,12 @@ if __name__ == "__main__":
     elif args.subcmd == 'txinfo':
         tx_info(args.gtf)
     elif args.subcmd == 't2g':
-        t2g(gtf=args.gtf, tfile=args.infile)
+        t2g(gtf_file=args.gtf, tfile=args.infile)
     elif args.subcmd == 'g2t':
-        g2t(gtf=args.gtf, gfile=args.infile)
+        g2t(gtf_file=args.gtf, gfile=args.infile)
     elif args.subcmd == 'tiv2giv':
-        tiv2giv(gtf=args.gtf, tivfile=args.infile)
+        tiv2giv(gtf_file=args.gtf, tivfile=args.infile)
     elif args.subcmd == 'giv2tiv':
-        giv2tiv(gtf=args.gtf, givfile=args.infile)
+        giv2tiv(gtf_file=args.gtf, givfile=args.infile)
 
 
