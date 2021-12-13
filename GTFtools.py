@@ -429,7 +429,7 @@ def g2t(gtf_file, gfile):
     return
 
 
-def tiv2giv(gtf_file, tivfile):
+def tiv2giv(gtf_file, tivfile, append=False):
     """
     convert transcript intervals to genomic intervals
 
@@ -442,7 +442,10 @@ def tiv2giv(gtf_file, tivfile):
             try:
                 tx = gtf[row[0]]
                 givs = tx.tiv_to_giv(int(row[1]), int(row[2]))
-                print('\t'.join(str(i) for i in tx.format_region_bed12(givs)))
+                if append:
+                    print('\t'.join([str(i) for i in tx.format_region_bed12(givs)] + row))
+                else:
+                    print('\t'.join(str(i) for i in tx.format_region_bed12(givs)))
             except KeyError:
                 print('Tx isoform {} was not found in GTF file!'.format(row[0]), file=sys.stderr)
     return
@@ -545,6 +548,8 @@ if __name__ == "__main__":
     parser_tiv2giv.add_argument('-i', '--infile', type = str,
         help='tab-delimited file with the first three columns composed of '
         'tx_id, start and end coordinates')
+    parser_tiv2giv.add_argument('-a', '--append', action='store_true',
+        help='whether to append input at the end of the ouput')
 
     parser_giv2tiv = subparsers.add_parser('giv2tiv',
         help='convert giv to tiv', parents=[parent_parser],
@@ -570,7 +575,7 @@ if __name__ == "__main__":
     elif args.subcmd == 'g2t':
         g2t(gtf_file=args.gtf, gfile=args.infile)
     elif args.subcmd == 'tiv2giv':
-        tiv2giv(gtf_file=args.gtf, tivfile=args.infile)
+        tiv2giv(gtf_file=args.gtf, tivfile=args.infile, append=args.append)
     elif args.subcmd == 'giv2tiv':
         giv2tiv(gtf_file=args.gtf, givfile=args.infile)
 
