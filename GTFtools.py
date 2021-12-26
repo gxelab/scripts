@@ -325,7 +325,6 @@ def parse_gtf(gtf_file):
     return gtf
 
 
-
 def exon_to_bed(gtf_file, extend=0):
     """
     print exons of each transcript in bed12 format
@@ -500,6 +499,68 @@ def tx_info(gtf_file):
     return
 
 
+def gtf_from_bed12(bed12_file):
+    """
+    parse transcript information represented in bed12 format
+    NB: this function is write when adding `extract_thick`, but has not been tested yet
+    """
+    gtf = {}
+    with open(beed12_file, 'rt') as f:
+        for line in f:
+            if line[0] == '#':
+                continue
+            ary = line.strip().split('\t')
+            gene = Gene(gene_id=ary[3], chrom=ary[0], strand=ary[5])
+            tx = Transcript(tx_id=ary[3], gene=gene)
+            gstart = int(ary[1]) + 1
+            gend = int(ary[2])
+            block_sizes = [int(i) for i in ary[10].split(',') if i != '']
+            block_starts = [int(i) for i in ary[11].split(',') if i != '']
+            for b in range(int(ary[9])):
+                b_start = gstart + block_starts[b]
+                b_end   = gstart + block_starts[b] + block_sizes[b] - 1
+                tx.add_region(region=Region(b_start, b_end), region_type='exon')
+            gtf[ary[3]] = tx
+    return gtf
+
+
+def extract_thick(bed12_file):
+    """
+    extract bed12 format of thick regions in original bed12 format
+    """
+    with open(bed12_file, 'rt') as f:
+        for line in f:
+            if line[0] == '#':
+                continue
+            ary = line.strip().split('\t')
+            # construct transcript model
+            gene = Gene(gene_id=ary[3], chrom=ary[0], strand=ary[5])
+            tx = Transcript(tx_id=ary[3], gene=gene)
+            gstart = int(ary[1]) + 1
+            gend = int(ary[2])
+            block_sizes = [int(i) for i in ary[10].split(',') if i != '']
+            block_starts = [int(i) for i in ary[11].split(',') if i != '']
+            for b in range(int(ary[9])):
+                b_start = gstart + block_starts[b]
+                b_end   = gstart + block_starts[b] + block_sizes[b] - 1
+                tx.add_region(region=Region(b_start, b_end), region_type='exon')
+            # giv to tiv
+            thick_gstart = int(ary[6]) + 1
+            thick_gend   = int(ary[7])
+            t1 = tx.gpos_to_tpos(thick_gstart)[0]
+            t2 = tx.gpos_to_tpos(thick_gend)[0]
+            if t1 < t2:
+                thick_tstart = t1
+                thick_tend   = t2
+            else:
+                thick_tstart = t2
+                thick_tend   = t1
+            # tiv to giv
+            givs = tx.tiv_to_giv(thick_tstart, thick_tend)
+            print('\t'.join(str(i) for i in tx.format_region_bed12(givs)))
+    return
+
+
 if __name__ == "__main__":
     # parent parser that holds common argument
     parent_parser = argparse.ArgumentParser(add_help=False)
@@ -515,6 +576,7 @@ if __name__ == "__main__":
 
     parser_txinfo = subparsers.add_parser('txinfo',
         help='summary information of each transcript',
+        parents=[parent_parser],
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     parser_tobed = subparsers.add_parser('convert2bed',
@@ -558,6 +620,13 @@ if __name__ == "__main__":
         help='tab-delimited file with the first three columns composed of '
         'tx_id, start and end coordinates')
 
+    # bed12 input
+    parser_extract_thick = subparsers.add_parser('extract_thick',
+        help='Extract bed12 of nested thick regions (pleause use bed12 as input gtf)',
+        parents=[parent_parser],
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+
     args = parser.parse_args()
     if args.subcmd == 'convert2bed':
         if args.type == 'exon':
@@ -578,5 +647,7 @@ if __name__ == "__main__":
         tiv2giv(gtf_file=args.gtf, tivfile=args.infile, append=args.append)
     elif args.subcmd == 'giv2tiv':
         giv2tiv(gtf_file=args.gtf, givfile=args.infile)
+    elif args.subcmd == 'extract_thick':
+        extract_thick(bed12_file=args.gtf)
 
 
