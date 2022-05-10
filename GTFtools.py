@@ -227,6 +227,7 @@ class Transcript:
         """
         cod1 = self.tpos_to_gpos(pos1)
         cod2 = self.tpos_to_gpos(pos2)
+
         start = min(cod1, cod2)
         end = max(cod1, cod2)
         givs = []
@@ -285,6 +286,7 @@ class Transcript:
         s = [self.gene.chrom, starts[0], ends[-1], self.tx_id, self.gene.gene_id,
              self.gene.strand, '0', '0', '0', len(starts)]
         s = s + [','.join(blocksize) + ',', ','.join(blockstart) + ',']
+
         return s
 
 
@@ -447,6 +449,8 @@ def tiv2giv(gtf_file, tivfile, append=False):
                     print('\t'.join(str(i) for i in tx.format_region_bed12(givs)))
             except KeyError:
                 print('Tx isoform {} was not found in GTF file!'.format(row[0]), file=sys.stderr)
+            except IndexError:
+                print('Cannot parse the entry:{}'.format(row), file=sys.stderr)
     return
 
 
@@ -505,7 +509,7 @@ def gtf_from_bed12(bed12_file):
     NB: this function is write when adding `extract_thick`, but has not been tested yet
     """
     gtf = {}
-    with open(beed12_file, 'rt') as f:
+    with open(bed12_file, 'rt') as f:
         for line in f:
             if line[0] == '#':
                 continue
@@ -622,7 +626,7 @@ if __name__ == "__main__":
 
     # bed12 input
     parser_extract_thick = subparsers.add_parser('extract_thick',
-        help='Extract bed12 of nested thick regions (pleause use bed12 as input gtf)',
+        help='Extract bed12 of nested thick regions (please use bed12 as input gtf)',
         parents=[parent_parser],
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
