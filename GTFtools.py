@@ -313,20 +313,20 @@ def parse_gtf(gtf_file):
         if line[0] == '#':
             continue
         ary = line.strip().split('\t')
-        m = regex_id.search(ary[8])
-        if m:
-            if m.group(2) in gtf:
-                gtf[m.group(2)].add_region(region = Region(int(ary[3]), int(ary[4])), region_type=ary[2])
+        m_id = regex_id.search(ary[8])
+        if m_id:
+            if m_id.group(2) in gtf:
+                gtf[m_id.group(2)].add_region(region = Region(int(ary[3]), int(ary[4])), region_type=ary[2])
             else:
-                m2 = regex_name.search(ary[8])
-                if m2:
-                    gene_name = m2.group(1)
+                m_name = regex_name.search(ary[8])
+                if m_name:
+                    gene_name = m_name.group(1)
                 else:
-                    gene_name = m.group(1)
-                gene = Gene(gene_id=m.group(1), gene_name=gene_name, chrom=ary[0], strand=ary[6])
-                tx = Transcript(tx_id=m.group(2), gene=gene)
+                    gene_name = m_id.group(1)
+                gene = Gene(gene_id=m_id.group(1), gene_name=gene_name, chrom=ary[0], strand=ary[6])
+                tx = Transcript(tx_id=m_id.group(2), gene=gene)
                 tx.add_region(region = Region(int(ary[3]), int(ary[4])), region_type=ary[2])
-                gtf[m.group(2)] = tx
+                gtf[m_id.group(2)] = tx
     f.close()
 
     for tx in gtf:
