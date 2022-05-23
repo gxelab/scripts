@@ -15,7 +15,6 @@ import sys
 import argparse
 import re
 import gzip
-import fileinput
 import csv
 from dataclasses import dataclass
 from typing import List
@@ -40,9 +39,10 @@ class Region:
 
 @dataclass
 class Gene:
-    gene_id: str
-    chrom: str = ''
-    strand: str = '+'
+    gene_id  : str
+    gene_name: str
+    chrom    : str = ''
+    strand   : str = '+'
 
 class Transcript:
     def __init__(self, tx_id: str, gene: Gene):
@@ -307,16 +307,23 @@ def parse_gtf(gtf_file):
     else:
         f = open(gtf_file)
 
+    regex_id = re.compile(r'gene_id "(.*?)".*?transcript_id "(.*?)"')
+    regex_name = re.compile(r'gene_name "(.*?)"')
     for line in f:
         if line[0] == '#':
             continue
         ary = line.strip().split('\t')
-        m = re.search(r'gene_id "(.*?)".*?transcript_id "(.*?)"', ary[8])
+        m = regex_id.search(ary[8])
         if m:
             if m.group(2) in gtf:
                 gtf[m.group(2)].add_region(region = Region(int(ary[3]), int(ary[4])), region_type=ary[2])
             else:
-                gene = Gene(gene_id=m.group(1), chrom=ary[0], strand=ary[6])
+                m2 = regex_name.search(ary[8])
+                if m2:
+                    gene_name = m2.group(1)
+                else:
+                    gene_name = m.group(1)
+                gene = Gene(gene_id=m.group(1), gene_name=gene_name, chrom=ary[0], strand=ary[6])
                 tx = Transcript(tx_id=m.group(2), gene=gene)
                 tx.add_region(region = Region(int(ary[3]), int(ary[4])), region_type=ary[2])
                 gtf[m.group(2)] = tx
@@ -626,7 +633,7 @@ if __name__ == "__main__":
 
     # bed12 input
     parser_extract_thick = subparsers.add_parser('extract_thick',
-        help='Extract bed12 of nested thick regions (please use bed12 as input gtf)',
+        help='Extract nested thick regions from bed12',
         parents=[parent_parser],
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
@@ -653,5 +660,3 @@ if __name__ == "__main__":
         giv2tiv(gtf_file=args.gtf, givfile=args.infile)
     elif args.subcmd == 'extract_thick':
         extract_thick(bed12_file=args.gtf)
-
-
