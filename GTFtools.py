@@ -307,28 +307,30 @@ def parse_gtf(gtf_file):
     else:
         f = open(gtf_file)
 
-    regex_id = re.compile(r'gene_id "(.*?)".*?transcript_id "(.*?)"')
+    regex_gid = re.compile(r'gene_id "(.*?)"')
+    regex_tid = re.compile(r'transcript_id "(.*?)"')
     regex_name = re.compile(r'gene_name "(.*?)"')
     for line in f:
         if line[0] == '#':
             continue
         ary = line.strip().split('\t')
-        m_id = regex_id.search(ary[8])
-        if m_id:
-            if m_id.group(2) in gtf:
-                gtf[m_id.group(2)].add_region(region = Region(int(ary[3]), int(ary[4])), region_type=ary[2])
+        m_tid = regex_tid.search(ary[8])
+        m_gid = regex_gid.search(ary[8])
+        if m_tid:
+            if m_tid.group(1) in gtf:
+                gtf[m_tid.group(1)].add_region(region = Region(int(ary[3]), int(ary[4])), region_type=ary[2])
             else:
                 m_name = regex_name.search(ary[8])
                 if m_name:
                     gene_name = m_name.group(1)
                 else:
-                    gene_name = m_id.group(1)
-                gene = Gene(gene_id=m_id.group(1), gene_name=gene_name, chrom=ary[0], strand=ary[6])
-                tx = Transcript(tx_id=m_id.group(2), gene=gene)
+                    gene_name = m_gid.group(1)
+                gene = Gene(gene_id=m_gid.group(1), gene_name=gene_name, chrom=ary[0], strand=ary[6])
+                tx = Transcript(tx_id=m_tid.group(1), gene=gene)
                 tx.add_region(region = Region(int(ary[3]), int(ary[4])), region_type=ary[2])
-                gtf[m_id.group(2)] = tx
+                gtf[m_tid.group(1)] = tx
     f.close()
-
+    
     for tx in gtf:
         gtf[tx].update()
     return gtf
