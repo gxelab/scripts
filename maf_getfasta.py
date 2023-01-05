@@ -41,12 +41,11 @@ def load_maf_index(maf_path, refsp):
     """
     maf_files = mglob(maf_path, '.maf')
     maf_files.sort()
-    # print(maf_files, file=sys.stderr)
     mafidx_files = mglob(maf_path, '.mafidx')
     mafidx_files.sort()
-    # print(mafidx_files, file=sys.stderr)
+    print('MAF files: ' + ','.join(maf_files[:3]) + ',...', file=sys.stderr)
+    print('MAF Index: ' + ','.join(mafidx_files[:3]) + ',...', file=sys.stderr)
     maf_prefix = [re.sub(r'.*(chr.*?)\.maf$', r'\1', i) for i in maf_files]
-    print(maf_prefix, file=sys.stderr)
     mafidx_prefix = [re.sub(r'.*(chr.*?)\.mafidx$', r'\1', i) for i in mafidx_files]
     print(mafidx_prefix, file=sys.stderr)
     if set(maf_prefix) != set(mafidx_prefix):
@@ -76,8 +75,7 @@ def load_splist(maf_path):
             for line in f:
                 splist.append(line.rstrip())
     except:
-        print('Warning: each fasta block is not ordered due to the following error!', file=sys.stderr)
-        print(traceback.format_exc(), file=sys.stderr)
+        print('Alignment blocks are disordered without species prefix order file!', file=sys.stderr)
     return splist
 
 
@@ -97,7 +95,7 @@ def parse_bed(mafs_indexed, splist, bed_path, out_path=None):
             if not chrom in mafs_indexed:
                 print('{}: chromosome not found!'.format(chrom), file=sys.stderr)
                 continue
-            strand = 1 if row[5] is '+' else -1
+            strand = 1 if row[5] == '+' else -1
             if len(row) >= 12:
                 block_sizes = [int(i) for i in row[10].rstrip(',').split(',')]
                 block_starts = [int(i) for i in row[11].rstrip(',').split(',')]
