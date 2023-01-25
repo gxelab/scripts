@@ -22,7 +22,7 @@ def main(bw_forward_path, bw_reverse_path, bed_path):
         intv_start = row[1] + block_start
         intv_end = intv_start + block_size
 
-        if row[5] is '+':
+        if row[5] == '+':
             bw = bw_fw
         else:
             bw = bw_rc
@@ -35,7 +35,7 @@ def main(bw_forward_path, bw_reverse_path, bed_path):
                 values = np.array(bw.values(chrom, i, j))
                 values[np.isnan(values)] = 0
                 ntcov = np.concatenate((ntcov, values))
-            if row[5] is '-':
+            if row[5] == '-':
                 ntcov = np.flip(ntcov)
         else:
             ntcov = np.zeros(sum(block_size))
