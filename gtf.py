@@ -8,8 +8,7 @@ note:
   excluded (before or after).
 - stop codon is not part of the CDS, at least for Ensembl GTF
 -----------------------------------------------------------------
-@author: zh (mt1022)
-@date: Fri Aug 27 2021
+@author: Hong Zhang (mt1022)
 """
 import sys
 import argparse
@@ -17,8 +16,8 @@ import re
 import gzip
 import csv
 from dataclasses import dataclass
-from typing import List
-
+from collections import defaultdict
+from typing import Any
 
 ###############################################################################
 # class definiton #############################################################
@@ -48,9 +47,9 @@ class Transcript:
     def __init__(self, tx_id: str, gene: Gene):
         self.tx_id: str = tx_id
         self.gene: Gene = gene
-        self.exons: List[Region] = []
-        self.cdss: List[Region] = []
-        self.stop_codon: List[Region] = []
+        self.exons: list[Region] = []
+        self.cdss: list[Region] = []
+        self.stop_codon: list[Region] = []
     
     def add_region(self, region, region_type):
         if region_type == 'exon':
@@ -293,13 +292,18 @@ class Transcript:
 ###############################################################################
 # functions ###################################################################
 ###############################################################################
-def parse_gtf(gtf_file):
+def parse_gtf(gtf_file, parse_attrs=False):
     """
     read GTF file
 
     param: path to GTF file, gzipped format allowed.
     """
     gtf = {}
+    if parse_attrs:
+        tx_meta = {}
+        metavars = dict(attrs=set(), tags=set())
+        regex_attr = re.compile(r'(\w+) "?(\w+)"?;')
+
     if gtf_file.endswith('.gz'):
         f = gzip.open(gtf_file, 'rt')
     elif gtf_file == '-':
@@ -310,6 +314,7 @@ def parse_gtf(gtf_file):
     regex_gid = re.compile(r'gene_id "(.*?)"')
     regex_tid = re.compile(r'transcript_id "(.*?)"')
     regex_name = re.compile(r'gene_name "(.*?)"')
+
     for line in f:
         if line[0] == '#':
             continue
@@ -317,8 +322,9 @@ def parse_gtf(gtf_file):
         m_tid = regex_tid.search(ary[8])
         m_gid = regex_gid.search(ary[8])
         if m_tid:
-            if m_tid.group(1) in gtf:
-                gtf[m_tid.group(1)].add_region(region = Region(int(ary[3]), int(ary[4])), region_type=ary[2])
+            tx_name = m_tid.group(1)
+            if tx_name in gtf:
+                gtf[tx_name].add_region(region = Region(int(ary[3]), int(ary[4])), region_type=ary[2])
             else:
                 m_name = regex_name.search(ary[8])
                 if m_name:
@@ -326,14 +332,29 @@ def parse_gtf(gtf_file):
                 else:
                     gene_name = m_gid.group(1)
                 gene = Gene(gene_id=m_gid.group(1), gene_name=gene_name, chrom=ary[0], strand=ary[6])
-                tx = Transcript(tx_id=m_tid.group(1), gene=gene)
+                tx = Transcript(tx_id=tx_name, gene=gene)
                 tx.add_region(region = Region(int(ary[3]), int(ary[4])), region_type=ary[2])
-                gtf[m_tid.group(1)] = tx
+                gtf[tx_name] = tx
+            if parse_attrs and ary[2] == 'transcript':
+                attrs = dict()
+                tags = dict()
+                for m in regex_attr.finditer(ary[8]):
+                    if m.group(1) == 'tag':
+                        tags[m.group(2)] = True
+                        metavars['tags'].add(m.group(2))
+                    else:
+                        attrs[m.group(1)] = m.group(2)
+                        metavars['attrs'].add(m.group(1))
+                tx_meta[tx_name] = dict(attrs=attrs, tags=tags)
+
     f.close()
     
     for tx in gtf:
         gtf[tx].update()
-    return gtf
+    if parse_attrs:
+        return gtf, tx_meta, metavars
+    else:
+        return gtf
 
 
 def exon_to_bed(gtf_file, extend=0):
@@ -490,24 +511,40 @@ def giv2tiv(gtf_file, givfile):
     return
 
 
-def tx_info(gtf_file):
+def tx_info(gtf_file, force_end_tags=False):
     """
     print summary information of each transcript
 
     param: path to GTF file, gzipped format allowed.
     note: stop codon is counted for CDS length, so that cds + utr5 + utr3 = transcript length
     """
-    gtf = parse_gtf(gtf_file)
-    header = ['tx_id', 'gene_id', 'chrom', 'strand', 'len', 'len_cds', 'len_utr5', 'len_utr3']
+    gtf, tx_meta, metavars= parse_gtf(gtf_file, parse_attrs=True)
+    # support user provide list of attrs or tags?
+    # attrs = attrs_user if attrs_user else list(metavars['attrs'].difference(['transcript_id', 'gene_id']))
+    # tags = tags_user if tags_user else list(metavars['tags'])
+    attrs = list(metavars['attrs'].difference(['transcript_id', 'gene_id']))
+    tags = list(metavars['tags'])
+
+    attrs.sort()
+    tags.sort()
+    if force_end_tags:
+        tags += ['cds_start_NF', 'cds_end_NF', 'mRNA_start_NF', 'mRNA_end_NF']
+
+    header = (['tx_name', 'gene_id', 'chrom', 'strand', 'nexon', 'tx_len', 'cds_len',
+        'utr5_len', 'utr3_len'] + [i.lower() for i in attrs] + [i.lower() for i in tags])
     print('\t'.join(header))
     for tx_id in gtf:
         tx = gtf[tx_id]
-        out = [tx.tx_id, tx.gene.gene_id, tx.gene.chrom, tx.gene.strand]
-        len_tx = len(tx)
-        len_utr5 = sum(len(i) for i in tx.five_prime_utrs)
-        len_cds = sum(len(i) for i in tx.cdss) + sum(len(i) for i in tx.stop_codon)
-        len_utr3 = len_tx - len_cds - len_utr5
-        out += [str(i) for i in [len_tx, len_cds, len_utr5, len_utr3]]
+        meta = tx_meta[tx_id]
+        nexon = len(tx.exons)
+        tx_len = len(tx)
+        cds_len = sum(len(i) for i in tx.cdss) + sum(len(i) for i in tx.stop_codon)
+        utr5_len = sum(len(i) for i in tx.five_prime_utrs)
+        utr3_len = (tx_len - cds_len - utr5_len) if cds_len > 0 else 0
+        out = ([tx.tx_id, tx.gene.gene_id, tx.gene.chrom, tx.gene.strand] +
+            [str(i) for i in [nexon, tx_len, cds_len, utr5_len, utr3_len]] +
+            [meta['attrs'].get(i, '') for i in attrs] +
+            [str(meta['tags'].get(i, False)) for i in tags])
         print('\t'.join(out))
     return
 
@@ -582,7 +619,7 @@ if __name__ == "__main__":
     
     
     # main parser with subparsers
-    parser = argparse.ArgumentParser(prog='GTFtools.py',
+    parser = argparse.ArgumentParser(prog='gtf.py',
         description='GTF file manipulation')
     subparsers = parser.add_subparsers(title='GTF operations',
         help='supported operations', dest='subcmd')
@@ -591,6 +628,8 @@ if __name__ == "__main__":
         help='summary information of each transcript',
         parents=[parent_parser],
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser_txinfo.add_argument('-f', '--force_end_check', action='store_true',
+        help='whether to include completeness checking tags')
 
     parser_tobed = subparsers.add_parser('convert2bed',
         help='convert GTF to bed12 format', parents=[parent_parser],
@@ -651,7 +690,7 @@ if __name__ == "__main__":
         else:
             utr3_to_bed(args.gtf, args.extend)
     elif args.subcmd == 'txinfo':
-        tx_info(args.gtf)
+        tx_info(args.gtf, args.force_end_check)
     elif args.subcmd == 't2g':
         t2g(gtf_file=args.gtf, tfile=args.infile)
     elif args.subcmd == 'g2t':
