@@ -134,9 +134,25 @@ def read_ribotish(path):
     ribotish.rename(columns={'Tid': 'tx_name', 'StartCodon': 'start_codon', 'TisType': 'orf_type_ori'}, inplace=True)
     ribotish[['tstart', 'tend', 'gene_id', 'gene_name']] = ribotish.apply(get_tiv_gene, axis=1, result_type='expand')
     ribotish['orf_id'] = ribotish.tx_name + '_' + ribotish.tstart.astype(str) + '_' + ribotish.tend.astype(str)
-    ribotish = ribotish[['orf_id', 'tx_name', 'tstart', 'tend', 'chrom', 'gstart', 'gend',
-                         'strand', 'start_codon', 'orf_type_ori', 'gene_id', 'gene_name']]
+    ribotish = ribotish[[
+        'orf_id', 'tx_name', 'tstart', 'tend', 'chrom', 'gstart', 'gend',
+        'strand', 'start_codon', 'orf_type_ori', 'gene_id', 'gene_name']]
     return ribotish
+
+
+def read_ribotricer(path):
+    """Read RiboTRicer results"""
+    ribotricer = pd.read_csv(path, sep='\t')
+    ribotricer.drop(columns = 'profile', inplace=True)
+    ribotricer.rename(columns={'ORF_ID': 'orf_id', 'transcript_id': 'tx_name', 'ORF_type': 'orf_type_ori'}, inplace=True)
+    ribotricer[['gstart', 'gend']] = ribotricer.orf_id.str.split('_', expand = True).iloc[:,1:3].astype(int)
+    ribotricer[['tstart', 'tend', 'gene_id', 'gene_name']] = ribotricer.apply(get_tiv_gene, axis=1, result_type='expand')
+    ribotricer['tend'] = ribotricer.tend + 3
+    ribotricer[['gstart', 'gend', 'gene_id', 'gene_name']] = ribotricer.apply(get_giv_gene, axis=1, result_type='expand')
+    ribotricer = ribotricer[[
+        'orf_id', 'tx_name', 'tstart', 'tend', 'chrom', 'gstart', 'gend',
+        'strand', 'start_codon', 'orf_type_ori', 'gene_id', 'gene_name']]
+    return ribotricer
 
 
 def orf_typing(row):
@@ -225,7 +241,7 @@ CHROM_RM = ['MT', 'mitochondrion_genome']
 @click.argument('path_gtf', type=click.STRING)
 @click.argument('path_txinfo', type=click.STRING)
 @click.option('-m', '--pred_method', default='price',
-              type=click.Choice(['price', 'ribocode', 'riborf', 'ribotish', 'bed12', 'tabular']),
+              type=click.Choice(['price', 'ribocode', 'riborf', 'ribotish', 'ribotricer', 'bed12', 'tabular']),
               help='ORF prediction method')
 @click.option('-p', '--prefix', default='orfpred', type=click.STRING,
               help='output prefix')
@@ -243,7 +259,7 @@ def main(path_orf_pred, path_gtf, path_txinfo, pred_method, prefix, keep_cds=Fal
     # input assertion
     assert Path(path_gtf).is_file()
     assert Path(path_txinfo).is_file()
-    assert pred_method in ['ribocode', 'ribotish', 'price', 'riborf', 'bed12', 'tabular']
+    assert pred_method in ['ribocode', 'ribotish', 'price', 'riborf', 'ribotricer', 'bed12', 'tabular']
 
     if pred_method == 'riborf':
         if Path(path_orf_pred).is_dir():
@@ -300,6 +316,8 @@ def main(path_orf_pred, path_gtf, path_txinfo, pred_method, prefix, keep_cds=Fal
         orfs_pred = read_price(path_orf_pred)
     elif pred_method == 'ribotish':
         orfs_pred = read_ribotish(path_orf_pred)
+    elif pred_method == 'ribotricer':
+        orfs_pred = read_ribotricer(path_orf_pred)
     elif pred_method == 'tabular':
         orfs_pred = pd.read_csv(path_orf_pred, sep='\t')
     elif pred_method == 'bed12':
