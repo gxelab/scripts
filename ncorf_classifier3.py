@@ -201,7 +201,7 @@ BIOTYPES = dict(
         mRNA=['protein_coding'],
         ncRNA=[
             'Mt_rRNA', 'Mt_tRNA', 'miRNA', 'pre_miRNA', 'misc_RNA', 'rRNA', 'known_ncrna',
-            'ribozyme', 'sRNA', 'scRNA', 'scaRNA', 'snRNA', 'snoRNA', 'ncRNA', 'tRNA'],
+            'ribozyme', 'sRNA', 'scRNA', 'scaRNA', 'snRNA', 'snoRNA', 'ncRNA', 'tRNA', 'vault_RNA', 'vaultRNA'],
         lncRNA=[
             'lncRNA', '3prime_overlapping_ncRNA', 'antisense', 'antisense_RNA',
             'lincRNA', 'macro_lncRNA', 'processed_transcript', 'sense_intronic',
@@ -218,8 +218,10 @@ BIOTYPES = dict(
             'IG_V_gene', 'IG_V_pseudogene', 'IG_pseudogene', 'TR_C_gene', 'TR_D_gene',
             'TR_J_gene', 'TR_J_pseudogene', 'TR_V_gene', 'TR_V_pseudogene'],
         misc=[
-            'non_stop_decay', 'nonsense_mediated_decay', 'TEC', 'vault_RNA', 'vaultRNA', 'artifact',
-            'disrupted_domain', 'ambiguous_orf', 'retained_intron', 'Readthrough']
+            'non_stop_decay', 'nonsense_mediated_decay', 'TEC', 'artifact',
+            'disrupted_domain', 'ambiguous_orf', 'retained_intron', 'Readthrough',
+            'protein_coding_LoF', 'protein_coding_CDS_not_defined'] 
+        # biotypes not present in this list will be assigned to "misc" category
     )
 
 
@@ -245,9 +247,9 @@ CHROM_RM = ['MT', 'mitochondrion_genome']
               help='ORF prediction method')
 @click.option('-p', '--prefix', default='orfpred', type=click.STRING,
               help='output prefix')
-@click.option('-k', '--keep_cds', is_flag=True, default=False,
-              help='whether to keep annotated CDSs and their variants')
-def main(path_orf_pred, path_gtf, path_txinfo, pred_method, prefix, keep_cds=False):
+@click.option('-c', '--exclude_cds', is_flag=True, default=False,
+              help='whether to exclude annotated CDSs and CDS isoforms')
+def main(path_orf_pred, path_gtf, path_txinfo, pred_method, prefix, exclude_cds=False):
     """
     A pipeline for the classification of non-canonical ORFs
 
@@ -277,34 +279,34 @@ def main(path_orf_pred, path_gtf, path_txinfo, pred_method, prefix, keep_cds=Fal
 
     # load transcript info ========================================================
     print('...load txinfo', file=sys.stderr)
-    txinfo_raw = pd.read_csv(path_txinfo, sep='\t')
+    txinfo = pd.read_csv(path_txinfo, sep='\t')
+    txinfo['tx_complete'] = ((txinfo.cds_start_nf | txinfo.cds_end_nf |
+        txinfo.mrna_start_nf | txinfo.mrna_end_nf) != True)
 
     # extract ends of annotated CDS
-    txinfo_raw['cds_start'] = np.where(
-        txinfo_raw.transcript_biotype == 'protein_coding',
-        txinfo_raw.utr5_len + 1, np.nan)
-    txinfo_raw['cds_end'] = np.where(
-        txinfo_raw.transcript_biotype == 'protein_coding',
-        txinfo_raw.utr5_len + txinfo_raw.cds_len, np.nan)
+    txinfo['cds_start'] = np.where(
+        txinfo.transcript_biotype == 'protein_coding',
+        txinfo.utr5_len + 1, np.nan)
+    txinfo['cds_end'] = np.where(
+        txinfo.transcript_biotype == 'protein_coding',
+        txinfo.utr5_len + txinfo.cds_len, np.nan)
 
     cds_ends = pd.concat([
-        (txinfo_raw
+        (txinfo
         .query('transcript_biotype == "protein_coding" and not cds_start_nf')
         .assign(
-            posn = txinfo_raw.cds_start,
+            posn = txinfo.cds_start,
             type = 'cds_start')[['tx_name', 'posn', 'type', 'chrom']]),
-        (txinfo_raw
+        (txinfo
         .query('transcript_biotype == "protein_coding" and not cds_end_nf')
         .assign(
-            posn = txinfo_raw.cds_end,
+            posn = txinfo.cds_end,
             type = 'cds_end')[['tx_name', 'posn', 'type', 'chrom']]) ])
     cds_ends['gposn'] = cds_ends.apply(lambda r: gtf[r.tx_name].tpos_to_gpos(int(r.posn)), axis=1)
 
     # clean transcripts used to annotate ORF types
-    biotypes_keep = BIOTYPES['mRNA'] + BIOTYPES['ncRNA'] + BIOTYPES['lncRNA'] + BIOTYPES['pseudogene']
-    txinfo_clean = txinfo_raw[txinfo_raw.transcript_biotype.isin(biotypes_keep)]
-    txinfo_clean = txinfo_clean[(txinfo_clean.cds_start_nf | txinfo_clean.cds_end_nf |
-                                txinfo_clean.mrna_start_nf | txinfo_clean.mrna_end_nf) != True]
+    # biotypes_keep = BIOTYPES['mRNA'] + BIOTYPES['ncRNA'] + BIOTYPES['lncRNA'] + BIOTYPES['pseudogene']
+    # txinfo_clean = txinfo_raw[txinfo_raw.transcript_biotype.isin(biotypes_keep)]
 
     # read ORF prediction =========================================================
     print('...read ORFs', file=sys.stderr)
@@ -409,8 +411,8 @@ def main(path_orf_pred, path_gtf, path_txinfo, pred_method, prefix, keep_cds=Fal
     # remove ORFs overlapping CDS ends ========================================
     print('...remove ORFs overlapping CDS ends', file=sys.stderr)
 
-    # remove ones that overlap with CDS starts
-    if keep_cds == False:
+    if exclude_cds == True:
+        # remove ones that overlap with CDS starts
         intersect_fine = intersect_fine.merge(
             cds_ends.loc[cds_ends.type == 'cds_start', ['chrom', 'gposn']],
             how='outer', indicator=True, left_on=['chrom', 'overlap_start'], right_on=['chrom', 'gposn'])
@@ -428,7 +430,7 @@ def main(path_orf_pred, path_gtf, path_txinfo, pred_method, prefix, keep_cds=Fal
     ncorf.columns = ['tx_name', 'orf_id', 'tstart', 'tend', 'gstart', 'gend', 'orf_len']
     ncorf = ncorf.astype({'tstart': int, 'tend': int, 'gstart': int, 'gend': int, 'orf_len': int})
     # merge with clean transcripts obtained in previous steps
-    ncorf = pd.merge(txinfo_clean, ncorf, on='tx_name', how='inner')
+    ncorf = pd.merge(txinfo, ncorf, on='tx_name', how='inner')
     ncorf = ncorf.fillna({'cds_start': 0, 'cds_end': 0}).astype({'cds_start': int, 'cds_end': int})
 
     # reannotate ORF types ========================================================
@@ -437,7 +439,7 @@ def main(path_orf_pred, path_gtf, path_txinfo, pred_method, prefix, keep_cds=Fal
     # append simplified transcrpt type
     biotype_table = get_biotype_table()
     ncorf = pd.merge(ncorf, biotype_table, left_on='transcript_biotype', right_on='biotype', how='left')
-    ncorf.loc[ncorf.txtype.isna(), 'txtype'] = 'misc'  # ORFs not considered by the current classifier
+    ncorf.loc[ncorf.txtype.isna(), 'txtype'] = 'misc'  # txtypes not classified in the biotype table
     ncorf.drop(columns=['biotype'], inplace=True)
 
     # classification
@@ -446,11 +448,10 @@ def main(path_orf_pred, path_gtf, path_txinfo, pred_method, prefix, keep_cds=Fal
     ncorf['orf_type'] = ncorf.apply(orf_typing, axis=1)
 
     # post-classification filtering and sorting
-    if keep_cds == False:
+    if exclude_cds == True:
         misc_cds_variants = ncorf[ncorf.orf_type.isin(
             ['iCDS', 'sCDS', 'N_extension', 'N_truncation', 'C_extension', 'C_truncation', 'wCDS'])]
         ncorf = ncorf[~ncorf.orf_id.isin(misc_cds_variants.orf_id)]
-    ncorf = ncorf.sort_values(by=['orf_id'], ignore_index=True)
 
     # prioritize ORF types ========================================================
     print('...prioritize ORF types', file=sys.stderr)
@@ -469,9 +470,8 @@ def main(path_orf_pred, path_gtf, path_txinfo, pred_method, prefix, keep_cds=Fal
         # start codon sequences should be determined manually afterwards
         columns_keep = ['orf_id', 'tx_name', 'txtype', 'orf_type',
                         'tstart', 'tend', 'chrom', 'strand', 'gstart', 'gend', 'orf_len', 'cds_start',
-                        'cds_end', 'phase_start', 'phase_end', 'gene_id', 'gene_name', 'gene_biotype',
-                        'transcript_biotype', 'protein_id', 'tx_len', 'cds_len', 'utr5_len', 'utr3_len',
-                        'cds_start_nf', 'cds_end_nf', 'mrna_start_nf', 'mrna_end_nf']
+                        'cds_end', 'gene_id', 'gene_name', 'gene_biotype', 'transcript_biotype', 'tx_len',
+                        'cds_len', 'utr5_len', 'utr3_len', 'tx_complete', 'phase_start', 'phase_end']
         final_table = ncorf[columns_keep]
     else:
         final_table = pd.merge(ncorf, orfs_pred[['orf_id', 'start_codon']], on='orf_id', how='left')
@@ -479,9 +479,8 @@ def main(path_orf_pred, path_gtf, path_txinfo, pred_method, prefix, keep_cds=Fal
                             on=['orf_id', 'tx_name'], how='left')
         columns_keep = ['orf_id', 'tx_name', 'txtype', 'start_codon', 'orf_type', 'orf_type_ori',
                         'tstart', 'tend', 'chrom', 'strand', 'gstart', 'gend', 'orf_len', 'cds_start',
-                        'cds_end', 'phase_start', 'phase_end', 'gene_id', 'gene_name', 'gene_biotype',
-                        'transcript_biotype', 'protein_id', 'tx_len', 'cds_len', 'utr5_len', 'utr3_len',
-                        'cds_start_nf', 'cds_end_nf', 'mrna_start_nf', 'mrna_end_nf']
+                        'cds_end', 'gene_id', 'gene_name', 'gene_biotype', 'transcript_biotype', 'tx_len',
+                        'cds_len', 'utr5_len', 'utr3_len', 'tx_complete', 'phase_start', 'phase_end']
         final_table = final_table[columns_keep]
 
     print(final_table.groupby(by='orf_type').size(), file=sys.stderr)
