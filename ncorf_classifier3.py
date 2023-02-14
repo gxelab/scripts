@@ -145,7 +145,9 @@ def read_ribotricer(path):
     ribotricer = pd.read_csv(path, sep='\t')
     ribotricer.drop(columns = 'profile', inplace=True)
     ribotricer.rename(columns={'ORF_ID': 'orf_id', 'transcript_id': 'tx_name', 'ORF_type': 'orf_type_ori'}, inplace=True)
-    ribotricer[['gstart', 'gend']] = ribotricer.orf_id.str.split('_', expand = True).iloc[:,1:3].astype(int)
+    ribotricer[['giv_start', 'giv_end']] = ribotricer.orf_id.str.split('_', expand = True).iloc[:,1:3].astype(int)
+    ribotricer['gstart'] = np.where(ribotricer.strand == '+', ribotricer.giv_start, ribotricer.giv_end)
+    ribotricer['gend'] = np.where(ribotricer.strand == '+', ribotricer.giv_end, ribotricer.giv_start)
     ribotricer[['tstart', 'tend', 'gene_id', 'gene_name']] = ribotricer.apply(get_tiv_gene, axis=1, result_type='expand')
     ribotricer['tend'] = ribotricer.tend + 3
     ribotricer[['gstart', 'gend', 'gene_id', 'gene_name']] = ribotricer.apply(get_giv_gene, axis=1, result_type='expand')
@@ -198,31 +200,31 @@ def orf_typing(row):
 # https://www.gencodegenes.org/pages/biotypes.html
 # https://asia.ensembl.org/info/genome/genebuild/biotypes.html
 BIOTYPES = dict(
-        mRNA=['protein_coding'],
-        ncRNA=[
-            'Mt_rRNA', 'Mt_tRNA', 'miRNA', 'pre_miRNA', 'misc_RNA', 'rRNA', 'known_ncrna',
-            'ribozyme', 'sRNA', 'scRNA', 'scaRNA', 'snRNA', 'snoRNA', 'ncRNA', 'tRNA', 'vault_RNA', 'vaultRNA'],
-        lncRNA=[
-            'lncRNA', '3prime_overlapping_ncRNA', 'antisense', 'antisense_RNA',
-            'lincRNA', 'macro_lncRNA', 'processed_transcript', 'sense_intronic',
-            'sense_overlapping', 'non_coding', 'bidirectional_promoter_lncRNA'],
-        pseudogene=[
-            'polymorphic_pseudogene', 'processed_pseudogene', 'pseudogene', 'retrotransposed',
-            'transcribed_processed_pseudogene', 'transcribed_unitary_pseudogene',
-            'transcribed_unprocessed_pseudogene', 'translated_processed_pseudogene',
-            'translated_unprocessed_pseudogene', 'unitary_pseudogene', 'unprocessed_pseudogene',
-            'Mt_tRNA_pseudogene', 'tRNA_pseudogene', 'snoRNA_pseudogene', 'snRNA_pseudogene',
-            'scRNA_pseudogene', 'rRNA_pseudogene', 'misc_RNA_pseudogene', 'miRNA_pseudogene'],
-        IGTR=[
-            'IG_C_gene', 'IG_C_pseudogene', 'IG_D_gene', 'IG_J_gene', 'IG_J_pseudogene', 'IG_LV_gene',
-            'IG_V_gene', 'IG_V_pseudogene', 'IG_pseudogene', 'TR_C_gene', 'TR_D_gene',
-            'TR_J_gene', 'TR_J_pseudogene', 'TR_V_gene', 'TR_V_pseudogene'],
-        misc=[
-            'non_stop_decay', 'nonsense_mediated_decay', 'TEC', 'artifact',
-            'disrupted_domain', 'ambiguous_orf', 'retained_intron', 'Readthrough',
-            'protein_coding_LoF', 'protein_coding_CDS_not_defined'] 
-        # biotypes not present in this list will be assigned to "misc" category
-    )
+     mRNA=['protein_coding'],
+    ncRNA=[
+        'Mt_rRNA', 'Mt_tRNA', 'miRNA', 'pre_miRNA', 'misc_RNA', 'rRNA', 'known_ncrna',
+        'ribozyme', 'sRNA', 'scRNA', 'scaRNA', 'snRNA', 'snoRNA', 'ncRNA', 'tRNA', 'vault_RNA', 'vaultRNA'],
+    lncRNA=[
+        'lncRNA', '3prime_overlapping_ncRNA', 'antisense', 'antisense_RNA',
+        'lincRNA', 'macro_lncRNA', 'processed_transcript', 'sense_intronic',
+        'sense_overlapping', 'non_coding', 'bidirectional_promoter_lncRNA'],
+    pseudogene=[
+        'polymorphic_pseudogene', 'processed_pseudogene', 'pseudogene', 'retrotransposed',
+        'transcribed_processed_pseudogene', 'transcribed_unitary_pseudogene',
+        'transcribed_unprocessed_pseudogene', 'translated_processed_pseudogene',
+        'translated_unprocessed_pseudogene', 'unitary_pseudogene', 'unprocessed_pseudogene',
+        'Mt_tRNA_pseudogene', 'tRNA_pseudogene', 'snoRNA_pseudogene', 'snRNA_pseudogene',
+        'scRNA_pseudogene', 'rRNA_pseudogene', 'misc_RNA_pseudogene', 'miRNA_pseudogene'],
+    IGTR=[
+        'IG_C_gene', 'IG_C_pseudogene', 'IG_D_gene', 'IG_J_gene', 'IG_J_pseudogene', 'IG_LV_gene',
+        'IG_V_gene', 'IG_V_pseudogene', 'IG_pseudogene', 'TR_C_gene', 'TR_D_gene',
+        'TR_J_gene', 'TR_J_pseudogene', 'TR_V_gene', 'TR_V_pseudogene'],
+    misc=[
+        'non_stop_decay', 'nonsense_mediated_decay', 'TEC', 'artifact',
+        'disrupted_domain', 'ambiguous_orf', 'retained_intron', 'Readthrough',
+        'protein_coding_LoF', 'protein_coding_CDS_not_defined'] 
+    # biotypes not present in this list will be assigned to "misc" category
+)
 
 
 def get_biotype_table():
@@ -242,14 +244,16 @@ CHROM_RM = ['MT', 'mitochondrion_genome']
 @click.argument('path_orf_pred', type=click.STRING)
 @click.argument('path_gtf', type=click.STRING)
 @click.argument('path_txinfo', type=click.STRING)
-@click.option('-m', '--pred_method', default='price',
+@click.option('-m', '--pred_method', default='bed12',
               type=click.Choice(['price', 'ribocode', 'riborf', 'ribotish', 'ribotricer', 'bed12', 'tabular']),
               help='ORF prediction method')
 @click.option('-p', '--prefix', default='orfpred', type=click.STRING,
               help='output prefix')
 @click.option('-c', '--exclude_cds', is_flag=True, default=False,
               help='whether to exclude annotated CDSs and CDS isoforms')
-def main(path_orf_pred, path_gtf, path_txinfo, pred_method, prefix, exclude_cds=False):
+@click.option('-u', '--unique_by_coord', is_flag=True, default=False,
+              help='whether to make input ORFs unique by genomic coordinates')
+def main(path_orf_pred, path_gtf, path_txinfo, pred_method, prefix, exclude_cds=False, unique_by_coord=False):
     """
     A pipeline for the classification of non-canonical ORFs
 
@@ -323,29 +327,39 @@ def main(path_orf_pred, path_gtf, path_txinfo, pred_method, prefix, exclude_cds=
     elif pred_method == 'tabular':
         orfs_pred = pd.read_csv(path_orf_pred, sep='\t')
     elif pred_method == 'bed12':
-        # NB: when using bed12, please keep entries genomically unique by yourself
         orfs_bed12 = pybedtools.BedTool(path_orf_pred).filter(lambda item: item.chrom not in CHROM_RM).saveas()
         orfs_pred = orfs_bed12.to_dataframe(names=[
             'orf_chrom', 'orf_start', 'orf_end', 'orf_id', 'orf_score', 'orf_strand', 'thick_start',
             'thick_end', 'item_rgb', 'block_count', 'block_sizes', 'block_starts'])
+        if orfs_pred.orf_id.duplicated().sum() > 0:
+            sys.exit('The name (4th) column has duplicated values!')
 
     # save raw results
     orfs_pred.to_csv(path_outraw, sep='\t', index=False)
 
+    # read ORF prediction =========================================================
+    print('...convert to bed6', file=sys.stderr)
     if pred_method == 'bed12':
         # calc ORF length
         if orfs_pred['block_sizes'][0][-1] == ',':
             orfs_pred['orf_len'] = orfs_pred['block_sizes'].apply(lambda x: sum(map(int, x.split(',')[:-1])))
         else:
             orfs_pred['orf_len'] = orfs_pred['block_sizes'].apply(lambda x: sum(map(int, x.split(','))))
+        # remove duplicated ORFs that have same genomic coordinates as previous ones
+        if unique_by_coord:
+            orfs_pred = orfs_pred.drop_duplicates(
+                subset=['orf_chrom', 'orf_start', 'orf_end', 'orf_len'], ignore_index=True)
         # get ORF giv bed (6 columns)
         orfs_bed = orfs_bed12.bed12tobed6()
     else:
-        # calc ORF length and drop duplicates
+        # calc ORF length
         orfs_pred['orf_len'] = orfs_pred.tend - orfs_pred.tstart + 1
-        orfs_pred = orfs_pred.drop_duplicates(subset=['chrom', 'gstart', 'gend'], ignore_index=True)
         # rmeove genes encoded by mitochrondria, which use non-standard genetic code
         orfs_pred = orfs_pred[~orfs_pred.chrom.isin(CHROM_RM)]
+        # remove duplicated ORFs that have same genomic coordinates as previous ones
+        if unique_by_coord:
+            orfs_pred = orfs_pred.drop_duplicates(
+                subset=['chrom', 'gstart', 'gend', 'orf_len'], ignore_index=True)
 
         # get ORF giv
         orfs_giv = orfs_pred.copy()
@@ -365,7 +379,7 @@ def main(path_orf_pred, path_gtf, path_txinfo, pred_method, prefix, exclude_cds=
         orfs_bed = pybedtools.BedTool(orfs_bed_path)
 
     # remap ORFs ==================================================================
-    print('...remap ORFs', file=sys.stderr)
+    print('...fetch compatible tx isoforms', file=sys.stderr)
 
     # convert transcript exons to a tempary bed file
     exons_bed = '/tmp/' + str(uuid4()) + '.bed'
@@ -401,6 +415,7 @@ def main(path_orf_pred, path_gtf, path_txinfo, pred_method, prefix, exclude_cds=
     ## total length overlapping is equal to ORF length: overlap len = ORF len
     intersect_fine = pd.merge(intersect_fine, orfs_pred[['orf_id', 'orf_len']], how='inner', on='orf_id')
     intersect_fine = intersect_fine[intersect_fine.overlap_tot == intersect_fine.orf_len]
+    ## some ORFs predicted by ribotricer were excluded at this stop because no stop codon (cds_end_nf)
 
     ## total length overlapping is equal to ORF length: overlap tiv span = ORF len
     intersect_fine['overlap_tstart'] = intersect_fine.apply(lambda r: gtf[r.tx_name].gpos_to_tpos(r.overlap_start)[0], axis=1)
@@ -409,9 +424,8 @@ def main(path_orf_pred, path_gtf, path_txinfo, pred_method, prefix, exclude_cds=
     intersect_fine = intersect_fine[intersect_fine.overlap_txlen == intersect_fine.orf_len]
 
     # remove ORFs overlapping CDS ends ========================================
-    print('...remove ORFs overlapping CDS ends', file=sys.stderr)
-
     if exclude_cds == True:
+        print('...remove ORFs overlapping CDS ends', file=sys.stderr)
         # remove ones that overlap with CDS starts
         intersect_fine = intersect_fine.merge(
             cds_ends.loc[cds_ends.type == 'cds_start', ['chrom', 'gposn']],
@@ -439,7 +453,7 @@ def main(path_orf_pred, path_gtf, path_txinfo, pred_method, prefix, exclude_cds=
     # append simplified transcrpt type
     biotype_table = get_biotype_table()
     ncorf = pd.merge(ncorf, biotype_table, left_on='transcript_biotype', right_on='biotype', how='left')
-    ncorf.loc[ncorf.txtype.isna(), 'txtype'] = 'misc'  # txtypes not classified in the biotype table
+    ncorf.loc[ncorf.txtype.isna(), 'txtype'] = 'misc'  # in case txtypes are not listed in the biotype table
     ncorf.drop(columns=['biotype'], inplace=True)
 
     # classification
@@ -452,9 +466,6 @@ def main(path_orf_pred, path_gtf, path_txinfo, pred_method, prefix, exclude_cds=
         misc_cds_variants = ncorf[ncorf.orf_type.isin(
             ['iCDS', 'sCDS', 'N_extension', 'N_truncation', 'C_extension', 'C_truncation', 'wCDS'])]
         ncorf = ncorf[~ncorf.orf_id.isin(misc_cds_variants.orf_id)]
-
-    # prioritize ORF types ========================================================
-    print('...prioritize ORF types', file=sys.stderr)
 
     # sort by orf_id and txtype
     cat_txtype = pd.api.types.CategoricalDtype(
