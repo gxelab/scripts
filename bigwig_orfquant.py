@@ -1,11 +1,10 @@
-# requires python >=3.9 for removesuffix
-
 import sys
 import pyBigWig
 import numpy as np
 import pandas as pd
 from scipy.stats import ranksums, wilcoxon
 from numpy.lib.stride_tricks import sliding_window_view
+import click
 
 
 def get_txcov(path_fwd, path_rev, givs):
@@ -107,20 +106,32 @@ def orf_stat(row, cov):
     ]
 
 
-def main(bw_forward_path, bw_reverse_path, bed_path, orfs_path):
+@click.command(context_settings=dict(help_option_names=['-h', '--help'], show_default=True))
+@click.argument('bw_fwd', type=click.STRING)
+@click.argument('bw_rev', type=click.STRING)
+@click.argument('tx_bed12', type=click.STRING)
+@click.argument('orf_table', type=click.STRING)
+def main(bw_fwd, bw_rev, tx_bed12, orf_table):
     """
+    Compute ribosomal footprint statistics for translated ORFs
+
+    \b
+    BW_FWD: p-site coverage on the plus strand (cmd: psite coverage)
+    BW_REV: p-site coverage on the minus strand (cmd: psite coverage)
+    TX_BED12: genomic coordinates of transcripts (cmd: gppy convert2bed)
+    ORF_table: table of translated ORFs (cmd: ncorf_classifier3.py)
     """
-    orfs = pd.read_csv(orfs_path, sep='\t')
+    orfs = pd.read_csv(orf_table, sep='\t')
     orfs['flank5'] = np.int64(orfs.tstart - 3 * np.minimum(5, np.floor((orfs.tstart - 1)/3)))
     orfs['flank3'] = np.int64(orfs.tend + 3 * np.minimum(5, np.floor((orfs.tx_len - orfs.tend)/3)))
 
-    tx_givs = pd.read_csv(bed_path, header=None, sep='\t')
+    tx_givs = pd.read_csv(tx_bed12, header=None, sep='\t')
     tx_givs.columns = [f'col{i + 1}' for i in tx_givs.columns]
     tx_givs = tx_givs[tx_givs.col4.isin(orfs.tx_name)]
     tx_givs['col11'] = tx_givs.col11.str.rstrip(',')
     tx_givs['col12'] = tx_givs.col12.str.rstrip(',')
 
-    txcov = get_txcov(bw_forward_path, bw_reverse_path, tx_givs)
+    txcov = get_txcov(bw_fwd, bw_rev, tx_givs)
 
     orf_stats = [
     'psite_total', 'psite_f0', 'psite_f1', 'psite_f2', 'n_codon',
@@ -128,9 +139,9 @@ def main(bw_forward_path, bw_reverse_path, bed_path, orfs_path):
     'wilcoxon1', 'wilcoxon2', 'ras', 'ras_pval', 'ras0', 'ras0_pval',
     'rrs', 'rrs_pval', 'rrs0', 'rrs0_pval', 'pme']
     orfs[orf_stats] = orfs.apply(orf_stat, axis=1, result_type='expand', cov=txcov)
-    orfs.to_csv(f"{orfs_path.removesuffix('.tsv')}orfquant.tsv", sep='\t', float_format='%g')
+    orfs.to_csv(f"{orf_table.removesuffix('.tsv')}orfquant.tsv", sep='\t', float_format='%g')
     return
 
 
 if __name__ == '__main__':
-    main(*sys.argv[1:])
+    main()
