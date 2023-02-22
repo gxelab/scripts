@@ -91,11 +91,14 @@ def orf_stat(row, cov):
 
     # PME as in RibORF (Ji et al., 2015, elife)
     # the 3p portion that is not enough for a window is dicarded
-    w = int(1 if psite_total > n_codon else np.floor(n_codon / psite_total))
-    wcnt = sliding_window_view(cov_orf_codon, window_shape=(3, w))[0][::w].sum(axis=(1, 2))
-    max_ent = np.sum(wcnt.size * (1 / wcnt.size)*np.log2(1/wcnt.size))
-    wp = (wcnt / wcnt.sum())[wcnt > 0]
-    pme = np.sum(wp * np.log2(wp)) / max_ent
+    if psite_total > 0:
+        w = int(1 if psite_total > n_codon else np.floor(n_codon / psite_total))
+        wcnt = sliding_window_view(cov_orf_codon, window_shape=(3, w))[0][::w].sum(axis=(1, 2))
+        max_ent = np.sum(wcnt.size * (1 / wcnt.size)*np.log2(1/wcnt.size))
+        wp = (wcnt / wcnt.sum())[wcnt > 0]
+        pme = np.sum(wp * np.log2(wp)) / max_ent
+    else:
+        pme = np.nan
     return [
         psite_total, psite_f0, psite_f1, psite_f2,  # psite counts
         n_codon, n_codon_cov, n_codon_cov0,  # coverage and uniformity
@@ -121,11 +124,11 @@ def main(bw_fwd, bw_rev, tx_bed12, orf_table):
     TX_BED12: genomic coordinates of transcripts (cmd: gppy convert2bed)
     ORF_table: table of translated ORFs (cmd: ncorf_classifier3.py)
     """
-    orfs = pd.read_csv(orf_table, sep='\t')
+    orfs = pd.read_table(orf_table)
     orfs['flank5'] = np.int64(orfs.tstart - 3 * np.minimum(5, np.floor((orfs.tstart - 1)/3)))
     orfs['flank3'] = np.int64(orfs.tend + 3 * np.minimum(5, np.floor((orfs.tx_len - orfs.tend)/3)))
 
-    tx_givs = pd.read_csv(tx_bed12, header=None, sep='\t')
+    tx_givs = pd.read_table(tx_bed12, header=None, dtype={0: 'string'})
     tx_givs.columns = [f'col{i + 1}' for i in tx_givs.columns]
     tx_givs = tx_givs[tx_givs.col4.isin(orfs.tx_name)]
     tx_givs['col11'] = tx_givs.col11.str.rstrip(',')
@@ -139,7 +142,7 @@ def main(bw_fwd, bw_rev, tx_bed12, orf_table):
     'wilcoxon1', 'wilcoxon2', 'ras', 'ras_pval', 'ras0', 'ras0_pval',
     'rrs', 'rrs_pval', 'rrs0', 'rrs0_pval', 'pme']
     orfs[orf_stats] = orfs.apply(orf_stat, axis=1, result_type='expand', cov=txcov)
-    orfs.to_csv(f"{orf_table.removesuffix('.tsv')}orfquant.tsv", sep='\t', float_format='%g')
+    orfs.to_csv(f"{orf_table.removesuffix('.tsv')}.orfquant.tsv", sep='\t', float_format='%g')
     return
 
 
