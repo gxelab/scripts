@@ -1,4 +1,3 @@
-import sys
 import pyBigWig
 import numpy as np
 import pandas as pd
@@ -9,6 +8,7 @@ import click
 
 def get_txcov(path_fwd, path_rev, givs):
     """
+    extract coverage for transcript genomic intervals from bigwig files
     """
     bw_fw = pyBigWig.open(path_fwd)
     bw_rc = pyBigWig.open(path_rev)
@@ -91,10 +91,10 @@ def orf_stat(row, cov):
 
     # PME as in RibORF (Ji et al., 2015, elife)
     # the 3p portion that is not enough for a window is dicarded
-    if psite_total > 0:
+    if psite_total > 1:
         w = int(1 if psite_total > n_codon else np.floor(n_codon / psite_total))
         wcnt = sliding_window_view(cov_orf_codon, window_shape=(3, w))[0][::w].sum(axis=(1, 2))
-        max_ent = np.sum(wcnt.size * (1 / wcnt.size)*np.log2(1/wcnt.size))
+        max_ent = np.sum(wcnt.size * (1 / wcnt.size) * np.log2(1/wcnt.size))
         wp = (wcnt / wcnt.sum())[wcnt > 0]
         pme = np.sum(wp * np.log2(wp)) / max_ent
     else:
@@ -123,6 +123,8 @@ def main(bw_fwd, bw_rev, tx_bed12, orf_table):
     BW_REV: p-site coverage on the minus strand (cmd: psite coverage)
     TX_BED12: genomic coordinates of transcripts (cmd: gppy convert2bed)
     ORF_table: table of translated ORFs (cmd: ncorf_classifier3.py)
+
+    note: It's better to filter too short ORFs (< 5 AA or 18 nt).  
     """
     orfs = pd.read_table(orf_table)
     orfs['flank5'] = np.int64(orfs.tstart - 3 * np.minimum(5, np.floor((orfs.tstart - 1)/3)))
