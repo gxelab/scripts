@@ -5,7 +5,63 @@ import pysam
 import numpy as np
 import pandas as pd
 import gppy.gtf as gtf
+from functools import partial
 
+
+def dist_worker(row, path_bam):
+    rlen_dist = Counter()
+    bam = pysam.AlignmentFile(path_bam, 'rb')
+    for align in bam.fetch(contig=row[1], start=row[2], stop=row[3]):
+        if align.is_reverse == (row[6] == '-'):
+            rlen_dist[align.query_alignment_length] += 1
+    return rlen_dist
+
+def floss(row, bam, lens, freq):
+    orf_dist = Counter()
+    for region in row.givs:
+        # Region start/end is 1-based
+        for align in bam.fetch(contig=row.chrom, start=region.start - 1, end=region.end):
+            if align.is_reverse != (row.strand == '-'):
+                continue
+            offset = align.get_tag('PS')
+            if align.is_reverse:
+                psite = align.get_reference_positions()[-(offset + 1)]
+            else:
+                psite = align.get_reference_positions()[offset]
+            # aligned positions is 0-based
+            if region.start - 1 <= psite < region.end:
+                orf_dist[align.query_alignment_length] += 1
+    orf_dist = np.array([orf_dist[i] for i in lens])
+    psite_tot = orf_dist.sum()
+    orf_dist = orf_dist / (psite_tot + 0.001)
+    score = np.abs(orf_dist - freq).sum()/2
+    return psite_tot, score
+
+
+def floss_worker(row, path_bam, lens, freq):
+    """
+    row: 1-orf_id, 2-tx_name, 3-chrom, 4-strand, 5-givs
+    """
+    orf_dist = Counter()
+    bam = pysam.AlignmentFile(path_bam, 'rb')
+    for region in row[5]:
+        # Region start/end is 1-based
+        for align in bam.fetch(contig=row[3], start=region.start - 1, end=region.end):
+            if align.is_reverse != (row[4] == '-'):
+                continue
+            offset = align.get_tag('PS')
+            if align.is_reverse:
+                psite = align.get_reference_positions()[-(offset + 1)]
+            else:
+                psite = align.get_reference_positions()[offset]
+            # aligned positions is 0-based
+            if region.start - 1 <= psite < region.end:
+                orf_dist[align.query_alignment_length] += 1
+    orf_dist = np.array([orf_dist[i] for i in lens])
+    psite_tot = orf_dist.sum()
+    orf_dist = orf_dist / (psite_tot + 0.001)  # pseudocount to avoid divid by zero
+    score = np.abs(orf_dist - freq).sum()/2
+    return psite_tot, score
 
 
 @click.command(context_settings=dict(help_option_names=['-h', '--help'], show_default=True))
@@ -33,7 +89,7 @@ def compute_floss(path_bam, path_gtf, txinfo_table, cds_bed, orf_table, output=N
     example command to generated required input tables:
     ```
     gppy convert2bed -t cds -g Drosophila_melanogaster.BDGP6.32.52.gtf \\
-        | bedtools bed12tobed6 | bedtools sort | bedtools merge -s -c 4,5,6 -o first > cdsmerge.bed
+        | bedtools bed12tobed6 | bedtools sort | bedtools merge -s -c 4,5,6 -o first > cds.merge.bed
     gppy txinfo -g Drosophila_melanogaster.BDGP6.32.52.gtf -f >Drosophila_melanogaster.BDGP6.32.52.gtf.txinfo
     ```
 
@@ -41,30 +97,22 @@ def compute_floss(path_bam, path_gtf, txinfo_table, cds_bed, orf_table, output=N
     """
     gannot = gtf.parse_gtf(path_gtf)
 
-    orfs = pd.read_table(orf_table)
+    orfs = pd.read_table(orf_table, dtype={'chrom': 'string'})
     orfs['givs'] = orfs.apply(lambda r: gannot[r.tx_name].tiv_to_giv(r.tstart, r.tend), axis=1)
 
-    txinfo = pd.read_table(txinfo_table)
+    txinfo = pd.read_table(txinfo_table, dtype={'chrom': 'string'})
     txinfo_pcg = txinfo[(txinfo.transcript_biotype == 'protein_coding') & (txinfo.cds_len > 30)]
     txinfo_pcg = txinfo_pcg.assign(cds_start=txinfo.utr5_len + 1, cds_end=txinfo.utr5_len + txinfo.cds_len)
     txinfo_pcg['givs'] = txinfo_pcg.apply(lambda r: gannot[r.tx_name].tiv_to_giv(r.cds_start, r.cds_end), axis=1)
     txinfo_pcg = txinfo_pcg[['gene_id', 'tx_name', 'chrom', 'strand', 'givs']]
 
     bam = pysam.AlignmentFile(path_bam, 'rb')
-    cds = pd.read_table(cds_bed, header=None)
+    cds = pd.read_table(cds_bed, header=None, dtype={0: 'string'})
     cds = cds.astype({0: 'string'})
     
     cds_dist = Counter()
 
     # reference read length frequency distribution
-    def worker(row):
-        rlen_dist = Counter()
-        bam = pysam.AlignmentFile(path_bam, 'rb')
-        for align in bam.fetch(contig=row[1], start=row[2], stop=row[3]):
-            if align.is_reverse == (row[6] == '-'):
-                rlen_dist[align.query_alignment_length] += 1
-        return rlen_dist
-
     if n_cpus == 1:
         for row in cds.itertuples():
             for align in bam.fetch(contig=row[1], start=row[2], stop=row[3]):
@@ -72,7 +120,8 @@ def compute_floss(path_bam, path_gtf, txinfo_table, cds_bed, orf_table, output=N
                     cds_dist[align.query_alignment_length] += 1
     else:
         with Pool(processes=n_cpus) as pool:
-            for counter in pool.map(worker, cds.itertuples(name=None)):
+            dist_worker_wrapper = partial(dist_worker, path_bam=path_bam)
+            for counter in pool.map(dist_worker_wrapper, cds.itertuples(name=None)):
                 cds_dist += counter
     
     cds_dist = pd.DataFrame.from_dict(cds_dist, orient='index').reset_index()
@@ -82,62 +131,17 @@ def compute_floss(path_bam, path_gtf, txinfo_table, cds_bed, orf_table, output=N
     ref_lens = cds_dist.len.to_numpy()
     ref_freq = cds_dist.freq.to_numpy()
     
-    # compute FLOSS
-    def floss(row):
-        orf_dist = Counter()
-        for region in row.givs:
-            # Region start/end is 1-based
-            for align in bam.fetch(contig=row.chrom, start=region.start - 1, end=region.end):
-                if align.is_reverse != (row.strand == '-'):
-                    continue
-                offset = align.get_tag('PS')
-                if align.is_reverse:
-                    psite = align.get_reference_positions()[-(offset + 1)]
-                else:
-                    psite = align.get_reference_positions()[offset]
-                # aligned positions is 0-based
-                if region.start - 1 <= psite < region.end:
-                    orf_dist[align.query_alignment_length] += 1
-        orf_dist = np.array([orf_dist[i] for i in ref_lens])
-        psite_tot = orf_dist.sum()
-        orf_dist = orf_dist / (psite_tot + 0.001)
-        score = np.abs(orf_dist - ref_freq).sum()/2
-        return psite_tot, score
-
-
-    def floss_worker(row):
-        """
-        row: 1-orf_id, 2-tx_name, 3-chrom, 4-strand, 5-givs
-        """
-        orf_dist = Counter()
-        bam = pysam.AlignmentFile(path_bam, 'rb')
-        for region in row[5]:
-            # Region start/end is 1-based
-            for align in bam.fetch(contig=row[3], start=region.start - 1, end=region.end):
-                if align.is_reverse != (row[4] == '-'):
-                    continue
-                offset = align.get_tag('PS')
-                if align.is_reverse:
-                    psite = align.get_reference_positions()[-(offset + 1)]
-                else:
-                    psite = align.get_reference_positions()[offset]
-                # aligned positions is 0-based
-                if region.start - 1 <= psite < region.end:
-                    orf_dist[align.query_alignment_length] += 1
-        orf_dist = np.array([orf_dist[i] for i in ref_lens])
-        psite_tot = orf_dist.sum()
-        orf_dist = orf_dist / (psite_tot + 0.001)  # pseudocount to avoid divid by zero
-        score = np.abs(orf_dist - ref_freq).sum()/2
-        return psite_tot, score
-    
+    # compute FLOSS    
     orfs_short = orfs[['orf_id', 'tx_name', 'chrom', 'strand', 'givs']].copy()
     if n_cpus == 1:
-        orfs_short[['floss_cnt', 'floss']] = orfs_short.apply(floss, axis=1, result_type='expand')
-        txinfo_pcg[['floss_cnt', 'floss']] = txinfo_pcg.apply(floss, axis=1, result_type='expand')
+        floss_wrapper = partial(floss, bam=bam, lens=ref_lens, freq=ref_freq)
+        orfs_short[['floss_cnt', 'floss']] = orfs_short.apply(floss_wrapper, axis=1, result_type='expand')
+        txinfo_pcg[['floss_cnt', 'floss']] = txinfo_pcg.apply(floss_wrapper, axis=1, result_type='expand')
     else:
         with Pool(processes=n_cpus) as pool:
-            orfs_short[['floss_cnt', 'floss']] = pool.map(floss_worker, orfs_short.itertuples(name=None))
-            txinfo_pcg[['floss_cnt', 'floss']] = pool.map(floss_worker, txinfo_pcg.itertuples(name=None))
+            floss_worker_wrapper = partial(floss_worker, path_bam=path_bam, lens=ref_lens, freq=ref_freq)
+            orfs_short[['floss_cnt', 'floss']] = pool.map(floss_worker_wrapper, orfs_short.itertuples(name=None))
+            txinfo_pcg[['floss_cnt', 'floss']] = pool.map(floss_worker_wrapper, txinfo_pcg.itertuples(name=None))
     
     txinfo_pcg.rename(columns={'gene_id': 'id'}, inplace=True)
     orfs_short.rename(columns={'orf_id': 'id'}, inplace=True)
