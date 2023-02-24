@@ -250,9 +250,9 @@ CHROM_RM = ['MT', 'mitochondrion_genome']
 @click.option('-p', '--prefix', default='orfpred', type=click.STRING,
               help='output prefix')
 @click.option('-c', '--exclude_cds', is_flag=True, default=False,
-              help='whether to exclude annotated CDSs and CDS isoforms')
+              help='exclude annotated CDSs and CDS isoforms')
 @click.option('-u', '--unique_by_coord', is_flag=True, default=False,
-              help='whether to make input ORFs unique by genomic coordinates')
+              help='make input ORFs unique by genomic coordinates')
 def main(path_orf_pred, path_gtf, path_txinfo, pred_method, prefix, exclude_cds=False, unique_by_coord=False):
     """
     A pipeline for the classification of non-canonical ORFs
