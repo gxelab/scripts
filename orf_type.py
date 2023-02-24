@@ -87,7 +87,7 @@ def read_ribocode(path):
     note: adjusted pval in collapsed output is meaningless since it's calculated after
     excluding entries with raw p value > 0.05.
     """
-    ribocode = pd.read_csv(path, sep = '\t', dtype={'chrom': 'string'})
+    ribocode = pd.read_table(path, type={'chrom': 'string'})
     if 'start_codon' not in ribocode.columns:
         ribocode['start_codon'] = 'ATG'
     ribocode = ribocode[['ORF_ID', 'transcript_id', 'ORF_tstart', 'ORF_tstop', 'chrom', 'ORF_gstart',
@@ -107,7 +107,7 @@ def get_giv_boundary(giv_str):
 
 def read_price(path):
     """Read PRICE results"""
-    price = pd.read_csv(path, sep='\t')
+    price = pd.read_table(path)
     price['tx_name'] = price.Id.str.split('_', expand=True)[0]
     price[['chrom_strand', 'givs']] = price.Location.str.split(':', expand=True)
     price['chrom'] = price.chrom_strand.str[:-1]
@@ -126,7 +126,7 @@ def read_price(path):
 
 def read_ribotish(path):
     """Read Ribo-TISH results"""
-    ribotish = pd.read_csv(path, sep='\t')
+    ribotish = pd.read_table(path)
     ribotish[['chrom', 'giv', 'strand']] = ribotish.GenomePos.str.split(':', expand=True)
     ribotish[['giv_start', 'giv_end']] = ribotish.giv.str.split('-', expand=True).astype(int)
     ribotish['gstart'] = np.where(ribotish.strand == '+', ribotish.giv_start + 1, ribotish.giv_end)
@@ -142,7 +142,7 @@ def read_ribotish(path):
 
 def read_ribotricer(path):
     """Read RiboTRicer results"""
-    ribotricer = pd.read_csv(path, sep='\t')
+    ribotricer = pd.read_table(path, dtype={'chrom': 'string'})
     ribotricer.drop(columns = 'profile', inplace=True)
     ribotricer.rename(columns={'ORF_ID': 'orf_id', 'transcript_id': 'tx_name', 'ORF_type': 'orf_type_ori'}, inplace=True)
     ribotricer[['giv_start', 'giv_end']] = ribotricer.orf_id.str.split('_', expand = True).iloc[:,1:3].astype(int)
