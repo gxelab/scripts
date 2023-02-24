@@ -87,7 +87,7 @@ def read_ribocode(path):
     note: adjusted pval in collapsed output is meaningless since it's calculated after
     excluding entries with raw p value > 0.05.
     """
-    ribocode = pd.read_table(path, type={'chrom': 'string'})
+    ribocode = pd.read_table(path, dtype={'chrom': 'string'})
     if 'start_codon' not in ribocode.columns:
         ribocode['start_codon'] = 'ATG'
     ribocode = ribocode[['ORF_ID', 'transcript_id', 'ORF_tstart', 'ORF_tstop', 'chrom', 'ORF_gstart',
