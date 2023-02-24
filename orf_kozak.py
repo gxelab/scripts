@@ -31,12 +31,13 @@ def read_fasta(path, ignore_version=False):
 @click.command(context_settings=dict(help_option_names=['-h', '--help'], show_default=True))
 @click.argument('orf_table', type=click.STRING)
 @click.option('-f', '--fas_path', type=click.STRING, default=['-'], multiple=True,
-              help='fasta of transcripts. can be specified multipled times')
+              help=('transcript sequences in fasta. can be specified multiple times if ' +
+              'sequences are stored in separate files (e.g., cdna.fa and ncrna.fa)'))
 @click.option('-i', '--ignore_txversion', is_flag=True, default=False,
               help='ignore transcript version in ".\d+" format')
 def get_kozak(orf_table, fas_path, ignore_txversion=True):
     """
-    Get Kozak sequence
+    Extract Kozak sequence for each ORF
     
     \b
     ORF_TABLE: table of ORFs (must have columns orf_id, tx_name, tstart)

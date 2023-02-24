@@ -119,10 +119,10 @@ def main(bw_fwd, bw_rev, tx_bed12, orf_table):
     Compute ribosomal footprint statistics for translated ORFs
 
     \b
-    BW_FWD: p-site coverage on the plus strand (cmd: psite coverage)
-    BW_REV: p-site coverage on the minus strand (cmd: psite coverage)
-    TX_BED12: genomic coordinates of transcripts (cmd: gppy convert2bed)
-    ORF_table: table of translated ORFs (cmd: ncorf_classifier3.py)
+    BW_FWD: genomic p-site coverage on the plus strand (cmd: `psite coverage` with genomic bam)
+    BW_REV: genomic p-site coverage on the minus strand (cmd: `psite coverage` with genomic bam)
+    TX_BED12: genomic coordinates of transcripts (cmd: `gppy convert2bed`)
+    ORF_table: table of translated ORFs (cmd: `orf_type.py`)
 
     note: It's better to filter too short ORFs (< 5 AA or 18 nt).  
     """
