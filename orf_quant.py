@@ -144,7 +144,8 @@ def main(bw_fwd, bw_rev, tx_bed12, orf_table):
     'wilcoxon1', 'wilcoxon2', 'ras', 'ras_pval', 'ras0', 'ras0_pval',
     'rrs', 'rrs_pval', 'rrs0', 'rrs0_pval', 'pme']
     orfs[orf_stats] = orfs.apply(orf_stat, axis=1, result_type='expand', cov=txcov)
-    orfs.to_csv(f"{orf_table.removesuffix('.tsv')}.orfquant.tsv", sep='\t', float_format='%g')
+    orfs.to_csv(f"{orf_table.removesuffix('.tsv')}.orfquant.tsv",
+                sep='\t', float_format='%g', index=False)
     return
 
 
