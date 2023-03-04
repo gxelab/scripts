@@ -114,7 +114,9 @@ def orf_stat(row, cov):
 @click.argument('bw_rev', type=click.STRING)
 @click.argument('tx_bed12', type=click.STRING)
 @click.argument('orf_table', type=click.STRING)
-def main(bw_fwd, bw_rev, tx_bed12, orf_table):
+@click.option('-o', '--output', type=click.STRING, default=None,
+              help='output path. Use the input prefix + "orfquant.tsv" is not set.')
+def main(bw_fwd, bw_rev, tx_bed12, orf_table, output=None):
     """
     Compute ribosomal footprint statistics for translated ORFs
 
@@ -122,7 +124,7 @@ def main(bw_fwd, bw_rev, tx_bed12, orf_table):
     BW_FWD: genomic p-site coverage on the plus strand (cmd: `psite coverage` with genomic bam)
     BW_REV: genomic p-site coverage on the minus strand (cmd: `psite coverage` with genomic bam)
     TX_BED12: genomic coordinates of transcripts (cmd: `gppy convert2bed`)
-    ORF_table: table of translated ORFs (cmd: `orf_type.py`)
+    ORF_TABLE: table of translated ORFs (cmd: `orf_type.py`)
 
     note: It's better to filter too short ORFs (< 5 AA or 18 nt).  
     """
@@ -139,13 +141,15 @@ def main(bw_fwd, bw_rev, tx_bed12, orf_table):
     txcov = get_txcov(bw_fwd, bw_rev, tx_givs)
 
     orf_stats = [
-    'psite_total', 'psite_f0', 'psite_f1', 'psite_f2', 'n_codon',
-    'n_codon_cov', 'n_codon_cov0', 'n_codon_f5p', 'n_codon_f3p',
-    'wilcoxon1', 'wilcoxon2', 'ras', 'ras_pval', 'ras0', 'ras0_pval',
-    'rrs', 'rrs_pval', 'rrs0', 'rrs0_pval', 'pme']
+        'psite_total', 'psite_f0', 'psite_f1', 'psite_f2', 'n_codon',
+        'n_codon_cov', 'n_codon_cov0', 'n_codon_f5p', 'n_codon_f3p',
+        'wilcoxon1', 'wilcoxon2', 'ras', 'ras_pval', 'ras0', 'ras0_pval',
+        'rrs', 'rrs_pval', 'rrs0', 'rrs0_pval', 'pme']
     orfs[orf_stats] = orfs.apply(orf_stat, axis=1, result_type='expand', cov=txcov)
-    orfs.to_csv(f"{orf_table.removesuffix('.tsv')}.orfquant.tsv",
-                sep='\t', float_format='%g', index=False)
+
+    if output == None:
+        output = f"{orf_table.removesuffix('.tsv')}.orfquant.tsv"
+    orfs.to_csv(output, sep='\t', float_format='%g', index=False)
     return
 
 
