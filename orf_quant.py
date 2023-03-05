@@ -128,7 +128,7 @@ def main(bw_fwd, bw_rev, tx_bed12, orf_table, output=None):
 
     note: It's better to filter too short ORFs (< 5 AA or 18 nt).  
     """
-    orfs = pd.read_table(orf_table)
+    orfs = pd.read_table(orf_table, dtype={'chrom': 'string'})
     orfs['flank5'] = np.int64(orfs.tstart - 3 * np.minimum(5, np.floor((orfs.tstart - 1)/3)))
     orfs['flank3'] = np.int64(orfs.tend + 3 * np.minimum(5, np.floor((orfs.tx_len - orfs.tend)/3)))
 
