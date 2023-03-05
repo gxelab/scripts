@@ -46,6 +46,12 @@ def orf_stat(row, cov):
     cov_f5p = cov[row.tx_name][(row.flank5 - 1):(row.tstart - 1)]
     cov_f3p = cov[row.tx_name][row.tend:row.flank3]
     # ignore stop codon when counting reads and codons
+    if (cov_orf.size % 3) != 0:
+        # some annotated CDSs are incomplete at either 5' or 3' end. Such ORFs
+        # are used as candidate ORFs by ribotricer, which will cause errors
+        # when running this script. we append 1 or 2 zero values to the end of
+        # this array so that the ORF length is a multiple of 3
+        cov_orf = np.concatenate((cov_orf, np.zeros(3 - (cov_orf.size % 3))))
     cov_orf_codon = cov_orf.reshape((3, -1))[:,:-1]
     cov_f5p_codon = cov_f5p.reshape((3, -1))
     cov_f3p_codon = cov_f3p.reshape((3, -1))
