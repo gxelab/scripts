@@ -43,7 +43,7 @@ frange$smoothed <- predict(fit, newdata = frange)
 min_cnt <- first(frange$cnt)
 min_cnt_floss <- first(frange$smoothed)
 max_cnt <- last(frange$cnt)
-max_cnt_floss <- last(frange$cnt)
+max_cnt_floss <- last(frange$smoothed)
 
 orf <- orf |> 
     mutate(floss_ubd = predict(fit, newdata = orf),
