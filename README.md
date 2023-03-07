@@ -1,7 +1,6 @@
-# scripts
-In-house scripts for data processing and analysis
+# Scripts
+In-house scripts for data processing and analyses at GxE Lab.
 
-# Documentation
-- [WiKi](https://github.com/gxelab/scripts/wiki) (Choose pages from the sidebar on the right side!)
+### Documentation
+- [WiKi](https://github.com/gxelab/scripts/wiki)
 - gtf.py: https://github.com/mt1022/GPP
-
