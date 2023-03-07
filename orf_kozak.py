@@ -41,6 +41,7 @@ def get_kozak(orf_table, fas_path, ignore_txversion=True):
     
     \b
     ORF_TABLE: table of ORFs (must have columns orf_id, tx_name, tstart)
+    output: stdout
     """
     fas = dict()
     for i in fas_path:

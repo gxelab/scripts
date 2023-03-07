@@ -153,7 +153,7 @@ def compute_floss(path_bam, path_gtf, txinfo_table, cds_bed, orf_table, output=N
     floss_tab
     if output == None:
         output = f'{orf_table}.floss'
-    floss_tab.to_csv(output, sep='\t', float_format='%g')
+    floss_tab.to_csv(output, sep='\t', float_format='%g', index=False)
     return
 
 

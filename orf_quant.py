@@ -46,6 +46,12 @@ def orf_stat(row, cov):
     cov_f5p = cov[row.tx_name][(row.flank5 - 1):(row.tstart - 1)]
     cov_f3p = cov[row.tx_name][row.tend:row.flank3]
     # ignore stop codon when counting reads and codons
+    if (cov_orf.size % 3) != 0:
+        # some annotated CDSs are incomplete at either 5' or 3' end. Such ORFs
+        # are used as candidate ORFs by ribotricer, which will cause errors
+        # when running this script. we append 1 or 2 zero values to the end of
+        # this array so that the ORF length is a multiple of 3
+        cov_orf = np.concatenate((cov_orf, np.zeros(3 - (cov_orf.size % 3))))
     cov_orf_codon = cov_orf.reshape((3, -1))[:,:-1]
     cov_f5p_codon = cov_f5p.reshape((3, -1))
     cov_f3p_codon = cov_f3p.reshape((3, -1))
@@ -114,7 +120,9 @@ def orf_stat(row, cov):
 @click.argument('bw_rev', type=click.STRING)
 @click.argument('tx_bed12', type=click.STRING)
 @click.argument('orf_table', type=click.STRING)
-def main(bw_fwd, bw_rev, tx_bed12, orf_table):
+@click.option('-o', '--output', type=click.STRING, default=None,
+              help='output path. Use the input prefix + "orfquant.tsv" is not set.')
+def main(bw_fwd, bw_rev, tx_bed12, orf_table, output=None):
     """
     Compute ribosomal footprint statistics for translated ORFs
 
@@ -122,11 +130,11 @@ def main(bw_fwd, bw_rev, tx_bed12, orf_table):
     BW_FWD: genomic p-site coverage on the plus strand (cmd: `psite coverage` with genomic bam)
     BW_REV: genomic p-site coverage on the minus strand (cmd: `psite coverage` with genomic bam)
     TX_BED12: genomic coordinates of transcripts (cmd: `gppy convert2bed`)
-    ORF_table: table of translated ORFs (cmd: `orf_type.py`)
+    ORF_TABLE: table of translated ORFs (cmd: `orf_type.py`)
 
     note: It's better to filter too short ORFs (< 5 AA or 18 nt).  
     """
-    orfs = pd.read_table(orf_table)
+    orfs = pd.read_table(orf_table, dtype={'chrom': 'string'})
     orfs['flank5'] = np.int64(orfs.tstart - 3 * np.minimum(5, np.floor((orfs.tstart - 1)/3)))
     orfs['flank3'] = np.int64(orfs.tend + 3 * np.minimum(5, np.floor((orfs.tx_len - orfs.tend)/3)))
 
@@ -139,12 +147,15 @@ def main(bw_fwd, bw_rev, tx_bed12, orf_table):
     txcov = get_txcov(bw_fwd, bw_rev, tx_givs)
 
     orf_stats = [
-    'psite_total', 'psite_f0', 'psite_f1', 'psite_f2', 'n_codon',
-    'n_codon_cov', 'n_codon_cov0', 'n_codon_f5p', 'n_codon_f3p',
-    'wilcoxon1', 'wilcoxon2', 'ras', 'ras_pval', 'ras0', 'ras0_pval',
-    'rrs', 'rrs_pval', 'rrs0', 'rrs0_pval', 'pme']
+        'psite_total', 'psite_f0', 'psite_f1', 'psite_f2', 'n_codon',
+        'n_codon_cov', 'n_codon_cov0', 'n_codon_f5p', 'n_codon_f3p',
+        'wilcoxon1', 'wilcoxon2', 'ras', 'ras_pval', 'ras0', 'ras0_pval',
+        'rrs', 'rrs_pval', 'rrs0', 'rrs0_pval', 'pme']
     orfs[orf_stats] = orfs.apply(orf_stat, axis=1, result_type='expand', cov=txcov)
-    orfs.to_csv(f"{orf_table.removesuffix('.tsv')}.orfquant.tsv", sep='\t', float_format='%g')
+
+    if output == None:
+        output = f"{orf_table.removesuffix('.tsv')}.orfquant.tsv"
+    orfs.to_csv(output, sep='\t', float_format='%g', index=False)
     return
 
 
