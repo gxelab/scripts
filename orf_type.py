@@ -141,7 +141,7 @@ def read_ribotish(path):
 
 
 def read_ribotricer(path):
-    """Read RiboTRicer results"""
+    """Read RiboTricer results"""
     ribotricer = pd.read_table(path, dtype={'chrom': 'string'})
     ribotricer.drop(columns = 'profile', inplace=True)
     ribotricer.rename(columns={'ORF_ID': 'orf_id', 'transcript_id': 'tx_name', 'ORF_type': 'orf_type_ori'}, inplace=True)

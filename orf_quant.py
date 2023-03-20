@@ -74,7 +74,7 @@ def orf_stat(row, cov):
         wilcoxon2 = np.nan
 
     # RRS (ribosome release score; Guttman et al., 2013, Cell; Chew et al., 2013, Development)
-    # RAS (ribosome association score; Chew et al., 2013, Development)
+    # RAS (ribosome association score; similar idea as RRS but for start codon)
     # add pseudocount 1 to avoid divid by zero and stabilize results 
     if n_codon_f5p > 0:
         ras = (psite_total + 1) / n_codon / ((cov_f5p.sum() + 1) / n_codon_f5p)
