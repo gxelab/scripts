@@ -108,7 +108,7 @@ def get_giv_boundary(giv_str):
 def read_price(path):
     """Read PRICE results"""
     price = pd.read_table(path)
-    price['tx_name'] = price.Id.str.split('_', expand=True)[0]
+    price['tx_name'] = price.Id.str.rsplit('_', n=2, expand=True)[0]
     price[['chrom_strand', 'givs']] = price.Location.str.split(':', expand=True)
     price['chrom'] = price.chrom_strand.str[:-1]
     price['strand'] = price.chrom_strand.str[-1]
@@ -141,7 +141,7 @@ def read_ribotish(path):
 
 
 def read_ribotricer(path):
-    """Read RiboTRicer results"""
+    """Read RiboTricer results"""
     ribotricer = pd.read_table(path, dtype={'chrom': 'string'})
     ribotricer.drop(columns = 'profile', inplace=True)
     ribotricer.rename(columns={'ORF_ID': 'orf_id', 'transcript_id': 'tx_name', 'ORF_type': 'orf_type_ori'}, inplace=True)
