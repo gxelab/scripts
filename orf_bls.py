@@ -92,6 +92,16 @@ def blsum(tree):
     return sum([n.dist for n in tree.traverse()][1:])
 
 
+def lastn(aln, n):
+    """index the start (in reverse order) of last n bases"""
+    i = 0
+    while n > 0 and i < len(aln):
+        i += 1
+        if aln[i] != '-':
+            n -= 1
+    return i
+
+
 @click.command(context_settings=dict(help_option_names=['-h', '--help'], show_default=True))
 @click.argument('path_asr', type=click.STRING)
 @click.argument('tree_asr', type=click.STRING)
@@ -223,7 +233,18 @@ def orf_bls(path_asr, tree_asr, tree_full, ref_sp, output_prefix, clean=False):
             print(tfull.to_str(compact=True, props=['name']), file=fh)
         # newick for Newick format; nhx for New Hampshire eXtended format
         with open(output_prefix + '.node_status.nhx', 'wt') as fh:
-            print(tasr.write(props=['orf']), file=fh)        
+            print(tasr.write(props=['orf']), file=fh)
+        # alignment of complete ORFs under origination node
+        sv_lastn = lastn(tasr[ref_sp].props['sequence'], 3)
+        with open(output_prefix + '.orfs_origin.fa', 'wt') as fh:
+            for n in origin_leaves_orf:
+                seq = tasr[n].props['sequence'][:-sv_lastn]
+                print(f'>{n}\n{seq}', end = '\n', file=fh)
+        # alignment of all complete ORFs
+        with open(output_prefix + '.orfs_naive.fa', 'wt') as fh:
+            for n in local_leaves_orf:
+                seq = tasr[n].props['sequence'][:-sv_lastn]
+                print(f'>{n}\n{seq}', end = '\n', file=fh)
     return out
 
 
