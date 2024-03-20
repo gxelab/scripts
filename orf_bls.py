@@ -240,11 +240,15 @@ def orf_bls(path_asr, tree_asr, tree_full, ref_sp, output_prefix, clean=False):
             for n in origin_leaves_orf:
                 seq = tasr[n].props['sequence'][:-sv_lastn]
                 print(f'>{n}\n{seq}', end = '\n', file=fh)
+        with open(output_prefix + '.orfs_origin.nwk', 'wt') as fh:
+            print(tmrca.write(), file=fh)
         # alignment of all complete ORFs
         with open(output_prefix + '.orfs_naive.fa', 'wt') as fh:
             for n in local_leaves_orf:
                 seq = tasr[n].props['sequence'][:-sv_lastn]
                 print(f'>{n}\n{seq}', end = '\n', file=fh)
+        with open(output_prefix + '.orfs_naive.nwk', 'wt') as fh:
+            print(tnaive.write(), file=fh)
     return out
 
 
