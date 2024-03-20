@@ -202,7 +202,7 @@ def orf_bls(path_asr, tree_asr, tree_full, ref_sp, output_prefix, clean=False):
     # bl_orf: total branch length of the subtree defined by leaves with conserved ORF structure， whose
     # root node is the same as naive_age_global
     naive_age_global = tfull.common_ancestor(local_leaves_orf).name
-    if origin_leaves_orf == [ref_sp]:
+    if local_leaves_orf == [ref_sp]:
         bl_sub_naive = 0
         bl_orf_naive = 0
     else:
@@ -236,19 +236,21 @@ def orf_bls(path_asr, tree_asr, tree_full, ref_sp, output_prefix, clean=False):
             print(tasr.write(props=['orf']), file=fh)
         # alignment of complete ORFs under origination node
         sv_lastn = lastn(tasr[ref_sp].props['sequence'], 3)
-        with open(output_prefix + '.orfs_origin.fa', 'wt') as fh:
-            for n in origin_leaves_orf:
-                seq = tasr[n].props['sequence'][:-sv_lastn]
-                print(f'>{n}\n{seq}', end = '\n', file=fh)
-        with open(output_prefix + '.orfs_origin.nwk', 'wt') as fh:
-            print(tmrca.write(), file=fh)
+        if origin_leaves_orf != [ref_sp]:
+            with open(output_prefix + '.orfs_origin.fa', 'wt') as fh:
+                for n in origin_leaves_orf:
+                    seq = tasr[n].props['sequence'][:-sv_lastn]
+                    print(f'>{n}\n{seq}', end = '\n', file=fh)
+            with open(output_prefix + '.orfs_origin.nwk', 'wt') as fh:
+                print(tmrca.write(), file=fh)
         # alignment of all complete ORFs
-        with open(output_prefix + '.orfs_naive.fa', 'wt') as fh:
-            for n in local_leaves_orf:
-                seq = tasr[n].props['sequence'][:-sv_lastn]
-                print(f'>{n}\n{seq}', end = '\n', file=fh)
-        with open(output_prefix + '.orfs_naive.nwk', 'wt') as fh:
-            print(tnaive.write(), file=fh)
+        if local_leaves_orf != [ref_sp]:
+            with open(output_prefix + '.orfs_naive.fa', 'wt') as fh:
+                for n in local_leaves_orf:
+                    seq = tasr[n].props['sequence'][:-sv_lastn]
+                    print(f'>{n}\n{seq}', end = '\n', file=fh)
+            with open(output_prefix + '.orfs_naive.nwk', 'wt') as fh:
+                print(tnaive.write(), file=fh)
     return out
 
 
