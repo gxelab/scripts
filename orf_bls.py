@@ -97,7 +97,7 @@ def lastn(aln, n):
     i = 0
     while n > 0 and i < len(aln):
         i += 1
-        if aln[i] != '-':
+        if aln[-i] != '-':
             n -= 1
     return i
 
