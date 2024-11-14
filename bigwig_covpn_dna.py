@@ -1,5 +1,4 @@
 import sys
-import re
 import pyBigWig
 import pandas as pd
 import numpy as np
@@ -23,7 +22,7 @@ def main(bw_path, bed_path):
 
         chroms = bw.chroms().keys()
 
-        chrom = str(row[0])  # chrom = re.sub(r'^chr', '', row[0])
+        chrom = str(row[0])
         if chrom in chroms:
             ntcov = np.empty((0,))
             for i, j in zip(intv_start, intv_end):

@@ -1,5 +1,4 @@
 import sys
-import re
 import pyBigWig
 import pandas as pd
 import numpy as np
