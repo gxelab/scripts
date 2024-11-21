@@ -36,11 +36,10 @@ def find_orfs(input_file, start_codons, stop_codons, direction, threads):
             strands = ['+' if direction == 'fwd' else '-']
         for s in strands:
             for start_codon in start_codons:
-                for stop_codon in stop_codons:
-                    for orf in find_orf(record.seq, start_codon, stop_codon, s):
-                        results.append('\t'.join([
-                            record.id, s, str(orf[0]), str(orf[1]), 
-                            str(orf[1] - orf[0]), start_codon, stop_codon, str(orf[2])]))
+                for orf in find_orf(record.seq, start_codon, stop_codons, s):
+                    results.append('\t'.join([
+                        record.id, s, str(orf[0]), str(orf[1]), 
+                        str(orf[1] - orf[0]), start_codon, str(orf[2][-3:]), str(orf[2])]))
         return results
 
     with ThreadPoolExecutor(max_workers=threads) as executor:
@@ -50,19 +49,20 @@ def find_orfs(input_file, start_codons, stop_codons, direction, threads):
                 print(result)
 
 
-def find_orf(seq, start_codon, stop_codon, strand):
+def find_orf(seq, start_codon, stop_codons, strand):
     start_codon = start_codon.upper()
-    stop_codon = stop_codon.upper()
+    stop_codons = [i.upper() for i in stop_codons]
     if strand == '-':
         seq = seq.reverse_complement()
     for i in range(0, len(seq) - 2):
         if seq[i : i + 3] == start_codon:
             for j in range(i + 3, len(seq) - 2, 3):
-                if seq[j:j+3] == stop_codon:
+                if seq[j:j+3] in stop_codons:
                     if strand == '-':
                         yield (len(seq) - (j + 3), len(seq) - i, seq[i : j + 3])
                     else:
                         yield (i, j + 3, seq[i : j + 3])
+                    break
 
 
 if __name__ == '__main__':
