@@ -55,9 +55,9 @@ def find_orf(seq, start_codon, stop_codon, strand):
     stop_codon = stop_codon.upper()
     if strand == '-':
         seq = seq.reverse_complement()
-    for i in range(0, len(seq)):
+    for i in range(0, len(seq) - 2):
         if seq[i : i + 3] == start_codon:
-            for j in range(i + 3, len(seq), 3):
+            for j in range(i + 3, len(seq) - 2, 3):
                 if seq[j:j+3] == stop_codon:
                     if strand == '-':
                         yield (len(seq) - (j + 3), len(seq) - i, seq[i : j + 3])
